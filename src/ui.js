@@ -460,15 +460,15 @@ export class UI {
         html += `<div class="unit" data-u="${c.id}:${e}">
           <div class="u-era">${ERAS[e].roman}</div>
           <div class="u-main"><div class="u-name">${esc(u.name)} <span class="u-own mono"></span></div>
-            <div class="u-desc">${esc(u.desc)}</div><div class="u-rate mono"></div></div>
-          <button class="buy" data-buy="${c.id}:${e}"><span class="b-n"></span><span class="b-c mono"></span></button></div>`;
+            <div class="u-desc">${esc(u.desc)}</div><div class="u-rate mono"></div><div class="u-tags"></div></div>
+          <button class="buy" data-buy="${c.id}:${e}"><span class="b-n"></span><span class="b-c mono"></span><span class="b-g mono"></span></button></div>`;
       }
       html += '</div>';
     }
     $('#units').innerHTML = html;
     this.unitEls = [...this.root.querySelectorAll('[data-u]')].map(el => {
       const [cat, e] = el.dataset.u.split(':');
-      return { el, cat, e: +e, own: $('.u-own', el), rate: $('.u-rate', el), btn: $('.buy', el), n: $('.b-n', el), c: $('.b-c', el) };
+      return { el, cat, e: +e, own: $('.u-own', el), rate: $('.u-rate', el), tags: $('.u-tags', el), btn: $('.buy', el), n: $('.b-n', el), c: $('.b-c', el), gn: $('.b-g', el) };
     });
   }
 
@@ -529,11 +529,26 @@ export class UI {
       const n = S.resolveAmt(g, u.cat, u.e, amt);
       const cost = S.unitCost(g, u.cat, u.e, n);
       const owned = r.units[u.cat][u.e];
-      const each = S.unitRate(u.cat, u.e, m);
+      const each = S.unitRate(g, u.cat, u.e, m);
+      const units = r.units[u.cat];
       setText(u.own, owned ? '×' + fmt(owned) : '');
       setText(u.rate, `${fmt(each)} t/s each${owned ? ' · ' + fmt(each * owned) + ' t/s total' : ''}`);
       setText(u.n, '×' + fmt(n));
       setText(u.c, cr(cost));
+      setText(u.gn, '+' + fmt(S.gainOf(g, u.cat, u.e, n, m)) + ' t/s');
+      // why this unit is (still) worth buying
+      const tags = [];
+      const wf = S.workforceX(units, u.e);
+      if (wf > 1.0001) tags.push(`<b class="t-wf" title="Every older ${esc(u.cat)} unit adds +1% to this one">WORKFORCE ×${wf.toFixed(2)}</b>`);
+      const ms = S.milestonesHit(owned), nx = S.nextMilestone(owned);
+      if (ms) tags.push(`<b class="t-ms" title="Each ownership milestone doubles this unit's output">MILESTONES ×${2 ** ms}</b>`);
+      if (nx) tags.push(`<span class="t-nx">next ×2 at ${nx[0]} (${nx[0] - owned} to go)</span>`);
+      if (u.e < r.era) {
+        const boosted = units.slice(u.e + 1).reduce((a, b) => a + b, 0);
+        tags.push(`<b class="t-cl" title="Obsolete equipment is ${Math.round((1 - S.depreciation(g, u.e)) * 100)}% off">CLEARANCE −${(100 - S.depreciation(g, u.e) * 100).toFixed(S.depreciation(g, u.e) < 0.001 ? 3 : 0)}%</b>`);
+        if (boosted) tags.push(`<span class="t-nx">each one +1% to ${fmt(boosted)} newer units</span>`);
+      }
+      setHTML(u.tags, tags.join(''));
       u.btn.classList.toggle('disabled', cost > r.credits);
     }
 
@@ -569,6 +584,9 @@ export class UI {
         <div class="memo-o">${e.opts.map((o, i) => `<button class="btn" data-memo="${i}">${esc(o.label)}</button>`).join('')}</div>`;
       el.hidden = false;
       this.sfx('memo');
+    } else if (ev.type === 'milestone') {
+      this.sfx('research');
+      this.toast(`MILESTONE — ${ev.count} × ${UNITS[ev.cat][ev.e].name}`, `${ev.text} Output ×2.`);
     } else if (ev.type === 'complete') {
       this.sfx('complete');
       this.showComplete();

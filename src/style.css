@@ -130,6 +130,7 @@ button { font: inherit; color: inherit; }
 .buy.disabled { background: var(--paper-2); color: var(--mute); box-shadow: none; cursor: default; }
 .buy .b-n { font-size: 10px; font-weight: 700; }
 .buy .b-c { font-size: 12px; font-weight: 700; }
+.buy .b-g { font-size: 9px; opacity: .85; white-space: nowrap; }
 .buy.flash { animation: flash .25s; }
 @keyframes flash { from { background: #fff; color: var(--ink); } }
 
@@ -286,3 +287,12 @@ body.no-ticker .memo { bottom: 100px; }
   body.no-ticker .mtn { bottom: calc(46vh + 10px); }
   body.no-ticker .memo { bottom: calc(46vh + 80px); }
 }
+
+/* ── unit tags: workforce / milestones / clearance ── */
+.u-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; font-family: var(--f-mono); font-size: 9px; }
+.u-tags:empty { display: none; }
+.u-tags b { font-weight: 700; padding: 0 4px; border: 1.5px solid var(--ink); }
+.u-tags .t-wf { background: var(--ink); color: var(--paper); }
+.u-tags .t-ms { background: var(--acc); border-color: var(--acc); color: #fff; }
+.u-tags .t-cl { border-color: var(--good); color: var(--good); }
+.u-tags .t-nx { color: var(--mute); }

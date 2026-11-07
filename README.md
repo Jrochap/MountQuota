@@ -15,6 +15,11 @@ Add `?speed=20` to the URL to fast-forward while testing.
 - **Pipeline**: Mining → Extraction → Processing. Each stage feeds a buffer. When the face pile or the yard fills up,
   the stage upstream stalls, so throughput equals your weakest stage (marked **BOTTLENECK**).
 - **Processing** turns rubble into Credits (₵, used for equipment) and Research (RP, used for the R&D tree).
+- **Old equipment stays relevant**:
+  - *Legacy Workforce*: every older unit gives +1% to all newer units in its department.
+  - *Milestones*: owning 25, 50, 100, 200 or 400 of a unit doubles its output each time.
+  - *Clearance*: obsolete units are 98% cheaper for each era they're behind.
+  - Each buy button shows exactly how many t/s that purchase adds.
 - **Density**: rock gets exponentially denser with depth, so every % of the mountain costs more than the last.
 - **R&D tree**: 6 eras × 7 rows. Each *Generational Leap* unlocks the next era of equipment:
   Hands & Hope → Steam & Soot → Diesel & Quarterly Reports → Silicon & Severance → Lasers & Liability → Post-Physical Synergy.
@@ -42,4 +47,4 @@ Add `?speed=20` to the URL to fast-forward while testing.
 | `src/main.js` | Loop, save/load (localStorage), offline progress |
 
 ## Balance (greedy simulated player)
-Run 1 ≈ 127 years (~42 min of real time at 20 s/year). Run 2 ≈ 88, run 3 ≈ 55, and about 10 years by run 9.
+Run 1 ≈ 105 years (~35 min of real time at 20 s/year; eras at years 12/22/36/55/79). Run 2 ≈ 58, run 3 ≈ 48, and about 10 years by run 10. Fresh runs on all 8 mountains land between 103 and 117 years. In a fresh run, about 38% of the output gained comes from buying older units.

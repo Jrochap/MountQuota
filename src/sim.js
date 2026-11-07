@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────────────────────
 import {
   SEC_PER_YEAR, GEN_YEARS, MASS_K, MASS_M0, STRATA, MOUNTAINS, MOUNTAIN_BY_ID, OFFER_SIZE, BASE_VALUE, RP_PER_TON, BUFFER_SECONDS, BUFFER_MIN,
-  COST_GROWTH, LEGACY_BONUS, LEGACY_PROGRESS, LEGACY_COMPLETE, PAR_YEARS,
+  COST_GROWTH, WORKFORCE, MILESTONES, MILESTONE_X, DEPRECIATION, LEGACY_BONUS, LEGACY_PROGRESS, LEGACY_COMPLETE, PAR_YEARS,
   CATS, UNITS, RESEARCH, RESEARCH_BY_ID, SKILLS, SKILL_BY_ID, TRUST_FUND,
   FIRST_NAMES, TRAITS, FOUNDER_TRAIT, EVENTS,
 } from './data.js';
@@ -104,14 +104,32 @@ function applyFx(m, fx) {
   }
 }
 
-export function unitRate(cat, e, m) { return UNITS[cat][e].rate * m[cat] * m.global; }
+// ── Unit output: base × Legacy Workforce × milestones ───────
+export function milestonesHit(n) { let k = 0; for (const [t] of MILESTONES) if (n >= t) k++; return k; }
+export function nextMilestone(n) { return MILESTONES.find(([t]) => n < t) || null; }
+const msX = n => Math.pow(MILESTONE_X, milestonesHit(n));
+// workforce multiplier for era e, given the department's unit counts u
+export function workforceX(u, e) { let s = 0; for (let k = 0; k < e; k++) s += u[k]; return 1 + WORKFORCE * s; }
+// raw department output (before research / global mods) for unit counts u
+function deptBase(cat, u) {
+  let s = 0;
+  for (let e = 0; e < u.length; e++) if (u[e]) s += u[e] * UNITS[cat][e].rate * msX(u[e]) * workforceX(u, e);
+  return s;
+}
+// per-unit output of (cat, e) at current counts
+export function unitRate(g, cat, e, m) {
+  const u = g.run.units[cat];
+  return UNITS[cat][e].rate * msX(u[e]) * workforceX(u, e) * m[cat] * m.global;
+}
+// exact output added to the department by buying n of (cat, e), including workforce and milestone effects
+export function gainOf(g, cat, e, n, m) {
+  const u = g.run.units[cat], before = deptBase(cat, u);
+  u[e] += n; const after = deptBase(cat, u); u[e] -= n;
+  return (after - before) * m[cat] * m.global;
+}
 export function rates(g, m) {
   const out = {};
-  for (const c of CAT_IDS) {
-    let s = 0; const u = g.run.units[c];
-    for (let e = 0; e < u.length; e++) s += u[e] * UNITS[c][e].rate;
-    out[c] = s * m[c] * m.global;
-  }
+  for (const c of CAT_IDS) out[c] = deptBase(c, g.run.units[c]) * m[c] * m.global;
   return out;
 }
 export function faceCap(R, m) { return Math.max(BUFFER_MIN * m.buffer, R.mining * BUFFER_SECONDS * m.buffer); }
@@ -189,12 +207,13 @@ export function simulate(g, seconds, step = 1) {
 }
 
 // ── Units ────────────────────────────────────────────────────
+export const depreciation = (g, e) => Math.pow(DEPRECIATION, Math.max(0, g.run.era - e));
 export function unitCost(g, cat, e, n = 1) {
-  const c0 = UNITS[cat][e].cost * Math.pow(COST_GROWTH, g.run.units[cat][e]);
+  const c0 = UNITS[cat][e].cost * depreciation(g, e) * Math.pow(COST_GROWTH, g.run.units[cat][e]);
   return c0 * (Math.pow(COST_GROWTH, n) - 1) / (COST_GROWTH - 1);
 }
 export function maxAffordable(g, cat, e) {
-  const c0 = UNITS[cat][e].cost * Math.pow(COST_GROWTH, g.run.units[cat][e]);
+  const c0 = UNITS[cat][e].cost * depreciation(g, e) * Math.pow(COST_GROWTH, g.run.units[cat][e]);
   const n = Math.floor(Math.log(g.run.credits * (COST_GROWTH - 1) / c0 + 1) / Math.log(COST_GROWTH));
   return Math.max(0, n);
 }
@@ -210,8 +229,16 @@ export function buyUnit(g, cat, e, amt = 1) {
   const cost = unitCost(g, cat, e, n);
   if (n < 1 || cost > r.credits) return false;
   r.credits -= cost;
-  r.units[cat][e] += n;
+  buyCount(g, cat, e, n);
   return true;
+}
+
+// add units and announce any milestone crossed
+function buyCount(g, cat, e, n) {
+  const u = g.run.units[cat], before = milestonesHit(u[e]);
+  u[e] += n;
+  const after = milestonesHit(u[e]);
+  for (let k = before; k < after; k++) g.out.push({ type: 'milestone', cat, e, count: MILESTONES[k][0], text: MILESTONES[k][1] });
 }
 
 function bestUnit(g, cat, m) {
@@ -219,7 +246,7 @@ function bestUnit(g, cat, m) {
   for (let e = 0; e <= g.run.era; e++) {
     const c = unitCost(g, cat, e, 1);
     if (c > g.run.credits) continue;
-    const s = UNITS[cat][e].rate / c;
+    const s = gainOf(g, cat, e, 1, m) / c;
     if (s > score) { score = s; best = e; }
   }
   return best;
@@ -231,7 +258,7 @@ export function autoBuy(g, m, R) {
     let bought = false;
     for (const c of cats) {
       const e = bestUnit(g, c, m);
-      if (e >= 0) { r.credits -= unitCost(g, c, e, 1); r.units[c][e]++; R[c] += unitRate(c, e, m); bought = true; break; }
+      if (e >= 0) { R[c] += gainOf(g, c, e, 1, m); r.credits -= unitCost(g, c, e, 1); buyCount(g, c, e, 1); bought = true; break; }
     }
     if (!bought) break;
     cats.sort((a, b) => R[a] - R[b]);

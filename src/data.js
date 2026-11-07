@@ -9,26 +9,26 @@ export const COMPANY = 'Quarry & Descendants Ltd.';
 export const SEC_PER_YEAR = 20;        // real seconds per in-game year
 export const GEN_YEARS = 25;           // years per generation (new CEO)
 // Rock gets denser with depth: volume fraction f costs M0·(e^(K·f) − 1) tons.
-export const MASS_K = Math.log(1e11);
+export const MASS_K = Math.log(1e13);
 export const MASS_M0 = 6000;
 // ── Mountains (a new one is offered on each Evolution) ───────
 // shape: geometry generator in scene.js · palette: rock colours · massX scales MASS_K (×1.05 ≈ 3.5× the tonnage)
 export const MOUNTAINS = [
   { id: 'obstinate', name: 'Mt. Obstinate', shape: 'peak', palette: 'granite', massX: 1, legacyX: 1, mods: {},
     blurb: 'A perfectly ordinary mountain with an attitude problem.' },
-  { id: 'twins', name: 'The Twin Liabilities', shape: 'twin', palette: 'slate', massX: 1.07, legacyX: 1.1, mods: { value: 1.25, extraction: 0.85 },
+  { id: 'twins', name: 'The Twin Liabilities', shape: 'twin', palette: 'slate', massX: 1.03, legacyX: 1.1, mods: { value: 1.25, extraction: 0.85 },
     blurb: 'Two peaks. Two faces. Twice the paperwork.' },
-  { id: 'mesa', name: 'Mesa Verde Capital', shape: 'mesa', palette: 'sandstone', massX: 0.93, legacyX: 1.05, mods: { mining: 1.4, value: 0.88 },
+  { id: 'mesa', name: 'Mesa Verde Capital', shape: 'mesa', palette: 'sandstone', massX: 0.99, legacyX: 1.05, mods: { mining: 1.4, value: 0.88 },
     blurb: 'Flat on top, like the org chart. Soft rock, cheap rock.' },
-  { id: 'volcano', name: 'Mt. Overdraft (Active)', shape: 'volcano', palette: 'basalt', massX: 1.12, legacyX: 1.25, mods: { value: 1.6, mining: 0.75 },
+  { id: 'volcano', name: 'Mt. Overdraft (Active)', shape: 'volcano', palette: 'basalt', massX: 1.07, legacyX: 1.25, mods: { value: 1.6, mining: 0.75 },
     blurb: 'Molten core. Insurance premiums also molten.' },
-  { id: 'ridge', name: 'The Long Grievance', shape: 'ridge', palette: 'shale', massX: 0.94, legacyX: 1.1, mods: { mining: 1.3, extraction: 0.75 },
+  { id: 'ridge', name: 'The Long Grievance', shape: 'ridge', palette: 'shale', massX: 1.0, legacyX: 1.1, mods: { mining: 1.3, extraction: 0.75 },
     blurb: 'A ridge so long the far end is in a different tax bracket.' },
-  { id: 'spire', name: 'Spire of Compliance', shape: 'spire', palette: 'quartz', massX: 1.05, legacyX: 1.15, mods: { mining: 0.8, rp: 1.4 },
+  { id: 'spire', name: 'Spire of Compliance', shape: 'spire', palette: 'quartz', massX: 1.09, legacyX: 1.15, mods: { mining: 0.8, rp: 1.4 },
     blurb: 'Tall, thin and absolutely refuses to bend.' },
-  { id: 'ziggurat', name: 'Ziggurat of Unpaid Interns', shape: 'ziggurat', palette: 'limestone', massX: 1.03, legacyX: 1.1, mods: { rp: 1.5, processing: 0.85 },
+  { id: 'ziggurat', name: 'Ziggurat of Unpaid Interns', shape: 'ziggurat', palette: 'limestone', massX: 1.05, legacyX: 1.1, mods: { rp: 1.5, processing: 0.85 },
     blurb: 'Built by an ancient civilisation, for exposure.' },
-  { id: 'marble', name: 'Marble Arch-Nemesis', shape: 'dome', palette: 'marble', massX: 1.13, legacyX: 1.3, mods: { value: 2, mining: 0.65 },
+  { id: 'marble', name: 'Marble Arch-Nemesis', shape: 'dome', palette: 'marble', massX: 1.08, legacyX: 1.3, mods: { value: 2, mining: 0.65 },
     blurb: 'Premium rock. Premium attitude. Chips if you look at it wrong.' },
 ];
 export const MOUNTAIN_BY_ID = Object.fromEntries(MOUNTAINS.map(m => [m.id, m]));
@@ -42,7 +42,20 @@ export const BASE_VALUE = 1;           // credits per processed ton
 export const RP_PER_TON = 0.1;         // research points per processed ton
 export const BUFFER_SECONDS = 20;      // buffer cap = upstream rate × this
 export const BUFFER_MIN = 60;          // minimum buffer cap (tons)
-export const COST_GROWTH = 1.15;
+export const COST_GROWTH = 1.17;
+// Legacy Workforce: every older unit still on payroll boosts all newer units in its department
+export const WORKFORCE = 0.01;
+// Ownership milestones: each threshold reached doubles that unit's output
+export const MILESTONES = [
+  [25,  'They have formed a choir.'],
+  [50,  'They have a group chat. You are not in it.'],
+  [100, 'They now refer to themselves as "the collective".'],
+  [200, 'Mid-sized nation status achieved.'],
+  [400, 'They have filed for statehood.'],
+];
+export const MILESTONE_X = 2;
+// Depreciation: obsolete equipment goes on clearance — price × this per era behind the current one
+export const DEPRECIATION = 0.02;
 export const LEGACY_BONUS = 0.005;     // +0.5% global output per lifetime Legacy
 export const LEGACY_PROGRESS = 15;     // Legacy for progress: 15 × f^1.2
 export const LEGACY_COMPLETE = 10;     // completion bonus × sqrt(PAR / years)
@@ -94,7 +107,7 @@ export const UNITS = {
 // ── Research tree ────────────────────────────────────────────
 // rows: 0 mining · 1 extraction · 2 processing · 3 commerce · 4 doctrine · 5 infrastructure · 6 leap
 export const RD_ROWS = ['Mining', 'Extraction', 'Processing', 'Commerce', 'Doctrine', 'Infrastructure', 'Generational Leap'];
-const B = [10, 2000, 6e5, 2e8, 8e10, 3e13];           // base RP cost per era
+const B = [10, 6e3, 5.4e6, 5.4e9, 6.5e12, 7.3e15];           // base RP cost per era
 const CAT_X = [2, 2, 2, 3, 3, 3];                     // category multiplier per era
 
 const RAW = [
