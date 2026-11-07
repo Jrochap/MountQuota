@@ -1,0 +1,2 @@
+# MountQuota
+Idle Mining game
