@@ -10,6 +10,11 @@ import { fmt, tons, cr, rp, pct, clock, yrs } from './format.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const h = (html) => { const t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstElementChild; };
+// Write to the DOM only when the value changes. Rewriting text under the cursor mid-press makes
+// WebKit (Safari) drop the click, and the HUD refreshes 10×/s.
+const setText = (el, v) => { v = String(v); if (el.textContent !== v) el.textContent = v; };
+const setHTML = (el, v) => { if (el._html !== v) { el._html = v; el.innerHTML = v; } };
+const setClass = (el, v) => { if (el.className !== v) el.className = v; };
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 export class UI {
@@ -126,6 +131,7 @@ export class UI {
 
     // events
     this.root.addEventListener('click', e => this.onClick(e));
+    this.bindBuyPress();
     this.buildTicker();
     this.buildRD();
     this.buildFam();
@@ -143,9 +149,9 @@ export class UI {
       this.markAmt(); this.unitKey = ''; return;
     }
     if (t.dataset.buy) {
-      const [cat, ei] = t.dataset.buy.split(':');
-      if (S.buyUnit(this.g, cat, +ei, this.g.settings.buyAmt)) this.flash(t);
-      this.update(true); return;
+      // mouse purchases already happened on pointerdown; clicks here are touch / pen / keyboard
+      if (this.pressBought === t.dataset.buy && e.detail > 0) { this.pressBought = null; return; }
+      this.buy(t); return;
     }
     if (t.dataset.auto) {
       this.run.autoOn[t.dataset.auto] = !this.run.autoOn[t.dataset.auto];
@@ -172,6 +178,42 @@ export class UI {
       const k = t.dataset.set, s = this.g.settings;
       s[k] = !s[k]; this.actions.settings(); this.renderLedger(); return;
     }
+  }
+
+  buy(btn) {
+    const [cat, ei] = btn.dataset.buy.split(':');
+    const ok = S.buyUnit(this.g, cat, +ei, this.g.settings.buyAmt);
+    if (ok) this.flash(btn);
+    this.update(true);
+    return ok;
+  }
+  // Mouse buys fire on press (immune to the cursor drifting off before release) and repeat while held.
+  bindBuyPress() {
+    let hold = null;
+    const stop = () => { if (hold) { clearTimeout(hold.t); hold = null; } };
+    this.root.addEventListener('pointerdown', e => {
+      this.pressBought = null;
+      if (e.pointerType !== 'mouse' || e.button !== 0) return;
+      const btn = e.target.closest('[data-buy]');
+      if (!btn) return;
+      e.preventDefault();
+      stop();
+      const key = btn.dataset.buy;
+      this.pressBought = key;
+      this.buy(btn);
+      const step = delay => {
+        hold = { t: setTimeout(() => {
+          // the list may have been rebuilt; find the live button for the same unit
+          const live = this.root.querySelector(`[data-buy="${key}"]`);
+          if (!live || !this.buy(live)) return stop();
+          step(Math.max(45, delay * 0.85));
+        }, delay) };
+      };
+      step(420);
+    });
+    addEventListener('pointerup', stop);
+    addEventListener('pointercancel', stop);
+    addEventListener('blur', stop);
   }
 
   markAmt() {
@@ -229,10 +271,10 @@ export class UI {
     this.rdCols = [...tree.querySelectorAll('[data-col]')];
   }
   updateRD() {
-    $('#rd-rp').innerHTML = `${rp(this.run.rp)} <span class="dim">+${fmt(this.run.flow.rp)}/s</span>`;
+    setHTML($('#rd-rp'), `${rp(this.run.rp)} <span class="dim">+${fmt(this.run.flow.rp)}/s</span>`);
     for (const el of this.rdNodes) {
       const st = S.researchState(this.g, el.dataset.node);
-      el.className = el.className.replace(/\b(done|locked|available|affordable)\b/g, '').trim() + ' ' + st;
+      setClass(el, el.className.replace(/\b(done|locked|available|affordable)\b/g, '').trim() + ' ' + st);
     }
     for (const c of this.rdCols) c.classList.toggle('locked', +c.dataset.col > this.run.era);
     for (const l of this.rdLinks) {
@@ -271,24 +313,24 @@ export class UI {
         <div class="n-fx"></div>
         <div class="n-cost mono"></div></div>`;
     }
-    tree.innerHTML = html;
+    setHTML(tree, html);
     tree.addEventListener('mouseover', e => {
       const el = e.target.closest('[data-skill]'); if (!el) return;
       const s = SKILL_BY_ID[el.dataset.skill], l = this.g.meta.skills[s.id] || 0;
       const next = l < s.max ? ` <span class="acc">Next: ${esc(s.fxt(l + 1))}</span>` : '';
-      $('#fam-info').innerHTML = `<b>${esc(s.name)}</b> — ${esc(s.desc)}${next}${s.req.length && s.id !== 'founder' ? ` <span class="dim">· requires ${s.req.map(([q, lv]) => esc(SKILL_BY_ID[q].name) + (lv > 1 ? ' ' + lv : '')).join(', ')}</span>` : ''}`;
+      setHTML($('#fam-info'), `<b>${esc(s.name)}</b> — ${esc(s.desc)}${next}${s.req.length && s.id !== 'founder' ? ` <span class="dim">· requires ${s.req.map(([q, lv]) => esc(SKILL_BY_ID[q].name) + (lv > 1 ? ' ' + lv : '')).join(', ')}</span>` : ''}`);
     });
     this.famNodes = [...tree.querySelectorAll('[data-skill]')];
     this.famLinks = [...tree.querySelectorAll('[data-link]')];
   }
   updateFam() {
     const meta = this.g.meta;
-    $('#fam-l').innerHTML = `◆${fmt(meta.legacy)} <span class="dim">· GENERATIONAL WEALTH +${fmt(meta.legacyTotal * LEGACY_BONUS * 100)}% ALL OUTPUT</span>`;
+    setHTML($('#fam-l'), `◆${fmt(meta.legacy)} <span class="dim">· GENERATIONAL WEALTH +${fmt(meta.legacyTotal * LEGACY_BONUS * 100)}% ALL OUTPUT</span>`);
     for (const el of this.famNodes) {
       const s = SKILL_BY_ID[el.dataset.skill], l = meta.skills[s.id] || 0, st = s.id === 'founder' ? 'maxed' : S.skillState(this.g, s.id);
-      el.className = el.className.replace(/\b(maxed|locked|available|affordable|owned)\b/g, '').trim() + ' ' + st + (l > 0 ? ' owned' : '');
-      el.children[1].textContent = l > 0 ? s.fxt(l) : s.fxt(1);
-      el.children[2].textContent = s.id === 'founder' ? 'DECEASED' : `${l}/${s.max}` + (l < s.max ? ` · ◆${fmt(s.cost(l))}` : ' · MAX');
+      setClass(el, el.className.replace(/\b(maxed|locked|available|affordable|owned)\b/g, '').trim() + ' ' + st + (l > 0 ? ' owned' : ''));
+      setText(el.children[1], l > 0 ? s.fxt(l) : s.fxt(1));
+      setText(el.children[2], s.id === 'founder' ? 'DECEASED' : `${l}/${s.max}` + (l < s.max ? ` · ◆${fmt(s.cost(l))}` : ' · MAX'));
     }
     for (const ln of this.famLinks) {
       const [a, b] = ln.dataset.link.split('>');
@@ -398,26 +440,26 @@ export class UI {
     const m = S.getMods(g), R = S.rates(g, m);
     const calLvl = meta.skills.calendar || 0;
     const ck = clock(r.complete ? r.finishYears : r.years, calLvl);
-    $('#year').textContent = ck.year;
-    $('#month').textContent = ck.month;
-    $('#gen').textContent = `GEN ${S.roman(r.gen + 1)}`;
-    $('#heir').textContent = `CEO ${r.heir.name}`;
-    $('#trait').textContent = `TRAIT: ${r.heir.trait.name} — ${Object.entries(r.heir.trait.mods).map(([k, v]) => `${k} ×${v}`).join(', ')}`;
+    setText($('#year'), ck.year);
+    setText($('#month'), ck.month);
+    setText($('#gen'), `GEN ${S.roman(r.gen + 1)}`);
+    setText($('#heir'), `CEO ${r.heir.name}`);
+    setText($('#trait'), `TRAIT: ${r.heir.trait.name} — ${Object.entries(r.heir.trait.mods).map(([k, v]) => `${k} ×${v}`).join(', ')}`);
 
     const f = S.progress(g);
-    $('#pct').textContent = pct(f, f < 0.1 ? 3 : 2);
+    setText($('#pct'), pct(f, f < 0.1 ? 3 : 2));
     $('#pbar').style.width = (f * 100) + '%';
-    $('#strata').textContent = S.stratum(f).toUpperCase();
-    $('#density').textContent = '×' + fmt(S.density(f));
-    $('#era-name').textContent = `${ERAS[r.era].roman} · ${ERAS[r.era].name.toUpperCase()}`;
+    setText($('#strata'), S.stratum(f).toUpperCase());
+    setText($('#density'), '×' + fmt(S.density(f)));
+    setText($('#era-name'), `${ERAS[r.era].roman} · ${ERAS[r.era].name.toUpperCase()}`);
 
-    $('#credits').textContent = cr(r.credits);
-    $('#credits-d').textContent = `+${fmt(r.flow.cash)}/s · ₵${fmt(S.valuePerTon(m))}/t`;
-    $('#rp').textContent = fmt(r.rp);
-    $('#rp-d').textContent = `+${fmt(r.flow.rp)}/s`;
-    $('#legacy').textContent = '◆' + fmt(meta.legacy);
+    setText($('#credits'), cr(r.credits));
+    setText($('#credits-d'), `+${fmt(r.flow.cash)}/s · ₵${fmt(S.valuePerTon(m))}/t`);
+    setText($('#rp'), fmt(r.rp));
+    setText($('#rp-d'), `+${fmt(r.flow.rp)}/s`);
+    setText($('#legacy'), '◆' + fmt(meta.legacy));
     const gain = S.legacyGain(g);
-    $('#legacy-d').textContent = gain > 0 ? `+${fmt(gain)} on evolve` : 'evolve to earn';
+    setText($('#legacy-d'), gain > 0 ? `+${fmt(gain)} on evolve` : 'evolve to earn');
 
     // pipeline
     const flows = { mining: r.flow.mine, extraction: r.flow.haul, processing: r.flow.proc };
@@ -425,18 +467,18 @@ export class UI {
     const minCat = ['mining', 'extraction', 'processing'].reduce((a, b) => (R[b] < R[a] ? b : a));
     for (const st of this.root.querySelectorAll('.stage')) {
       const c = st.dataset.cat;
-      $('.st-rate', st).innerHTML = `${fmt(flows[c])}<small> / ${fmt(R[c])} t/s</small>`;
+      setHTML($('.st-rate', st), `${fmt(flows[c])}<small> / ${fmt(R[c])} t/s</small>`);
       let fill = 0, note = '';
       if (c === 'mining') { fill = r.face / fc; note = fill > 0.97 ? 'FACE CLOGGED' : `face ${tons(r.face)}`; }
       else if (c === 'extraction') { fill = r.yard / yc; note = fill > 0.97 ? 'YARD FULL' : `yard ${tons(r.yard)}`; }
       else { note = `₵${fmt(S.valuePerTon(m))}/t · ${fmt(S.rpPerTon(m))} RP/t`; fill = R.processing > 0 ? Math.min(1, flows.processing / R.processing) : 0; }
       $('.st-buf i', st).style.width = (Math.min(1, fill) * 100) + '%';
-      $('.st-note', st).textContent = note;
+      setText($('.st-note', st), note);
       const tag = $('.tag', st);
-      tag.textContent = c === minCat ? 'BOTTLENECK' : '';
+      setText(tag, c === minCat ? 'BOTTLENECK' : '');
       st.classList.toggle('neck', c === minCat);
     }
-    $('#buffs').innerHTML = r.buffs.map(b => `<span class="buff ${b.x < 1 ? 'neg' : ''}">${b.k.toUpperCase()} ×${b.x} <i>${Math.ceil(b.until - r.t)}s</i></span>`).join('');
+    setHTML($('#buffs'), r.buffs.map(b => `<span class="buff ${b.x < 1 ? 'neg' : ''}">${b.k.toUpperCase()} ×${b.x} <i>${Math.ceil(b.until - r.t)}s</i></span>`).join(''));
 
     // units
     const key = `${r.era}|${m.auto}|${g.settings.buyAmt}|${JSON.stringify(r.autoOn)}`;
@@ -447,18 +489,18 @@ export class UI {
       const cost = S.unitCost(g, u.cat, u.e, n);
       const owned = r.units[u.cat][u.e];
       const each = S.unitRate(u.cat, u.e, m);
-      u.own.textContent = owned ? '×' + fmt(owned) : '';
-      u.rate.textContent = `${fmt(each)} t/s each${owned ? ' · ' + fmt(each * owned) + ' t/s total' : ''}`;
-      u.n.textContent = '×' + fmt(n);
-      u.c.textContent = cr(cost);
+      setText(u.own, owned ? '×' + fmt(owned) : '');
+      setText(u.rate, `${fmt(each)} t/s each${owned ? ' · ' + fmt(each * owned) + ' t/s total' : ''}`);
+      setText(u.n, '×' + fmt(n));
+      setText(u.c, cr(cost));
       u.btn.classList.toggle('disabled', cost > r.credits);
     }
 
     // badges
     const rdAff = RESEARCH.filter(n => S.researchState(g, n.id) === 'affordable').length;
-    $('#rd-badge').textContent = rdAff ? rdAff : '';
+    setText($('#rd-badge'), rdAff ? rdAff : '');
     const famAff = SKILLS.filter(s => s.id !== 'founder' && S.skillState(g, s.id) === 'affordable').length;
-    $('#fam-badge').textContent = famAff ? famAff : (gain > 0 && f > 0.25 ? '◆' : '');
+    setText($('#fam-badge'), famAff ? famAff : (gain > 0 && f > 0.25 ? '◆' : ''));
 
     if (this.open === 'rd') this.updateRD();
     if (this.open === 'fam') { this.updateFam(); if (force) this.renderEvolve(); }

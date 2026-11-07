@@ -183,7 +183,8 @@ export function resolveAmt(g, cat, e, amt) {
 export function buyUnit(g, cat, e, amt = 1) {
   const r = g.run;
   if (e > r.era) return false;
-  const n = resolveAmt(g, cat, e, amt);
+  let n = resolveAmt(g, cat, e, amt);
+  if (amt === 'max') while (n > 1 && unitCost(g, cat, e, n) > r.credits) n--;   // float-rounding guard
   const cost = unitCost(g, cat, e, n);
   if (n < 1 || cost > r.credits) return false;
   r.credits -= cost;
