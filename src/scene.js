@@ -7,7 +7,8 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { progress, getMods, rates, faceCap, yardCap } from './sim.js';
+import { progress, getMods, rates, faceCap, yardCap, mtnDef } from './sim.js';
+import { MOUNTAINS } from './data.js';
 
 const C = {
   bg: 0xd9d4c8, ground: 0xd2ccbf, slab: 0xc4bdb0, slabSide: 0x8f897d, ink: 0x161616, accent: 0xff4f12,
@@ -121,6 +122,67 @@ class Particles {
     if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
   }
 }
+
+// ── mountain shapes: (u, v) are cell coords / R; return column height (and lava flag) ──
+const pos0 = v => Math.max(0, v);
+const SHAPES = {
+  peak: (u, v, H, n1, n2, x, z) => {
+    const fall = pos0(1 - Math.hypot(u, v));
+    let h = H * Math.pow(fall, 1.35);
+    h = Math.max(h, H * 0.62 * Math.pow(pos0(1 - Math.hypot(u - 0.38, v + 0.3) / 0.55), 1.6));
+    return { h: h + (n1(x * 0.16 + 3, z * 0.16) - 0.5) * 9 * fall + (n2(x * 0.45, z * 0.45) - 0.5) * 3 * fall };
+  },
+  twin: (u, v, H, n1, n2, x, z) => {
+    const a = pos0(1 - Math.hypot(u + 0.42, v + 0.05) / 0.62), b = pos0(1 - Math.hypot(u - 0.45, v - 0.12) / 0.56);
+    const saddle = H * 0.32 * Math.pow(pos0(1 - Math.hypot(u * 0.6, v * 1.4)), 1.2);
+    const fall = pos0(1 - Math.hypot(u, v) * 0.85);
+    return { h: Math.max(H * 1.0 * Math.pow(a, 1.25), H * 0.82 * Math.pow(b, 1.25), saddle) + (n1(x * 0.18, z * 0.18) - 0.5) * 7 * fall };
+  },
+  mesa: (u, v, H, n1, n2, x, z) => {
+    const d = Math.hypot(u, v * 1.15) + (n1(x * 0.12, z * 0.12) - 0.5) * 0.22;
+    let h = d < 0.66 ? H * 0.48 : d < 0.92 ? H * 0.48 * Math.pow((0.92 - d) / 0.26, 0.55) : 0;
+    const butte = Math.hypot(u + 0.25, v + 0.2);
+    if (butte < 0.24) h = H * 0.66;
+    return { h: h > 0 ? h + (n2(x * 0.5, z * 0.5) - 0.5) * 1.6 : 0 };
+  },
+  volcano: (u, v, H, n1, n2, x, z) => {
+    const d = Math.hypot(u, v) + (n1(x * 0.2, z * 0.2) - 0.5) * 0.08;
+    const rim = H * 0.86 * Math.pow(0.8, 1.05);
+    if (d < 0.2) return { h: rim - (0.2 - d) / 0.2 * H * 0.26, lava: d < 0.15 };
+    return { h: H * 0.86 * Math.pow(pos0(1 - d), 1.05) + (n2(x * 0.4, z * 0.4) - 0.5) * 2.5 * pos0(1 - d) };
+  },
+  ridge: (u, v, H, n1, n2, x, z) => {
+    const a = -0.8, uu = u * Math.cos(a) + v * Math.sin(a), vv = -u * Math.sin(a) + v * Math.cos(a);
+    const d = Math.hypot(uu / 1.12, vv / 0.42);
+    const fall = pos0(1 - d);
+    const jag = (n2(x * 0.35, z * 0.35) - 0.5) * 9 + (n1(x * 0.11, z * 0.11) - 0.5) * 10;
+    return { h: H * 0.72 * Math.pow(fall, 0.9) + jag * fall };
+  },
+  spire: (u, v, H, n1, n2, x, z) => {
+    const d = Math.hypot(u, v);
+    const needle = H * 1.35 * Math.pow(pos0(1 - d / 0.5), 1.5);
+    const apron = H * 0.24 * Math.pow(pos0(1 - d), 1.8);
+    return { h: Math.max(needle, apron) + (n2(x * 0.5, z * 0.5) - 0.5) * 2 * pos0(1 - d) };
+  },
+  ziggurat: (u, v) => {
+    const c = Math.max(Math.abs(u), Math.abs(v)) / 0.82;
+    return { h: c < 1 ? (Math.floor((1 - c) * 7) + 1) * 34 * 0.11 : 0 };
+  },
+  dome: (u, v, H, n1, n2, x, z) => {
+    const d = Math.hypot(u * 0.95, v * 1.05);
+    return { h: d < 1 ? H * 0.6 * Math.sqrt(1 - d * d) + (n1(x * 0.15, z * 0.15) - 0.5) * 2.5 : 0 };
+  },
+};
+const PALETTES = {
+  granite:   { strata: [0x8b877f, 0x9a958c, 0x7f7b74, 0xa49f95, 0x918c83], cap: C.white, ore: C.accent, oreRate: 0.025 },
+  slate:     { strata: [0x6f747a, 0x7c8187, 0x646970, 0x868b90], cap: 0xe8ecef, ore: C.accent, oreRate: 0.022 },
+  sandstone: { strata: [0xb5714d, 0xc4845c, 0xa86643, 0xcf9a72, 0xb97c58], cap: null, ore: 0xf4efe6, oreRate: 0.02 },
+  basalt:    { strata: [0x3a3836, 0x45423f, 0x302e2c, 0x4d4a46], cap: null, ore: C.accent, oreRate: 0.04 },
+  shale:     { strata: [0x7d7468, 0x8a8174, 0x6f675c, 0x978d7f], cap: C.white, ore: C.accent, oreRate: 0.02 },
+  quartz:    { strata: [0xc9c6d2, 0xd8d5df, 0xbbb8c6, 0xe4e1ea], cap: 0xffffff, ore: C.accent, oreRate: 0.02 },
+  limestone: { strata: [0xd6c9a8, 0xbfae88, 0xe0d4b6, 0xa8977a], cap: null, ore: C.accent, oreRate: 0.015, tiers: true },
+  marble:    { strata: [0xeeeae3, 0xe2ddd4, 0xf6f3ee, 0xd8d2c8], cap: null, ore: 0x55524e, oreRate: 0.06 },
+};
 
 // ═════════════════════════════════════════════════════════════
 export class Site {
@@ -285,38 +347,46 @@ export class Site {
   }
 
   // ── the mountain ─────────────────────────────────────────
-  buildMountain() {
-    const N = 48, R = 22, H = 34;
+  buildMountain(def = MOUNTAINS[0], seed = 7) {
+    if (this.mountain) {
+      this.scene.remove(this.mountain);
+      this.mountain.geometry.dispose(); this.mountain.material.dispose();
+      for (const list of this.miners || []) for (const a of list) a.k = -1;
+    }
+    this.mtnKey = def.id + ':' + seed;
+    this.mtnDef = def;
+    const N = 54, R = 22, H = 34;
     const cx = -12, cz = -6;
-    const n1 = valueNoise(7), n2 = valueNoise(19), r = rng(42);
+    const n1 = valueNoise(seed), n2 = valueNoise(seed + 12), r = rng(seed + 35);
+    const shape = SHAPES[def.shape] || SHAPES.peak;
+    const pal = PALETTES[def.palette] || PALETTES.granite;
     const vox = [];
+    this.lava = [];
     for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
       const x = i - N / 2 + 0.5, z = j - N / 2 + 0.5;
-      const d = Math.hypot(x, z) / R;
-      const fall = Math.max(0, 1 - d);
-      let h = H * Math.pow(fall, 1.35);
-      const d2 = Math.hypot(x / R - 0.38, z / R + 0.3) / 0.55;
-      h = Math.max(h, H * 0.62 * Math.pow(Math.max(0, 1 - d2), 1.6));
-      h += (n1(x * 0.16 + 3, z * 0.16) - 0.5) * 9 * fall + (n2(x * 0.45, z * 0.45) - 0.5) * 3 * fall;
-      const top = Math.floor(h);
-      for (let y = 0; y < top; y++) vox.push({ x: x + cx, y, z: z + cz, top, key: y + 0.06 * x + r() * 2.6 });
+      const { h, lava } = shape(x / R, z / R, H, (a, b) => n1(a, b), (a, b) => n2(a, b), x, z);
+      const top = Math.max(0, Math.floor(h));
+      for (let y = 0; y < top; y++) vox.push({ x: x + cx, y, z: z + cz, top, lava: lava && y === top - 1, key: y + 0.06 * x + r() * 2.6 });
     }
     // removal order: highest key first (top-down, quarry face toward the yard)
     vox.sort((a, b) => b.key - a.key);
     this.total = vox.length;
     this.vox = vox;
     this.mountainCenter = new THREE.Vector3(cx, 0, cz);
+    const peak = vox.reduce((a, v) => (v.y > a.y ? v : a), vox[0]);
+    this.summit = new THREE.Vector3(def.shape === 'volcano' ? cx : peak.x, peak.y + 1, def.shape === 'volcano' ? cz : peak.z);
 
-    const strata = [0x8b877f, 0x9a958c, 0x7f7b74, 0xa49f95, 0x918c83];
     const geo = new THREE.BoxGeometry(0.97, 0.97, 0.97);
     const mesh = this.mountain = new THREE.InstancedMesh(geo, std(0xffffff), vox.length);
     mesh.castShadow = true; mesh.receiveShadow = true; mesh.frustumCulled = false;
-    const cr = rng(3);
+    const cr = rng(seed - 4);
     vox.forEach((v, i) => {
       let col;
-      if (v.y > H * 0.74 || (v.y === v.top - 1 && v.y > H * 0.6)) col = C.white;           // snow cap
-      else if (cr() < 0.025) col = C.accent;                                                 // ore
-      else col = strata[Math.floor((v.y + Math.sin(v.x * 0.3) * 1.2) / 3) % strata.length];
+      if (v.lava) col = C.accent;
+      else if (pal.cap && (v.y > H * 0.74 || (v.y === v.top - 1 && v.y > H * 0.6))) col = pal.cap;
+      else if (cr() < pal.oreRate) col = pal.ore;
+      else if (pal.tiers) col = pal.strata[Math.floor(v.top > 0 ? v.y / (H * 0.11) : 0) % pal.strata.length];
+      else col = pal.strata[Math.floor((v.y + Math.sin(v.x * 0.3) * 1.2) / 3) % pal.strata.length];
       _c.set(col);
       const j = 0.94 + cr() * 0.1; _c.multiplyScalar(j);
       v.color = _c.getHex();
@@ -529,10 +599,14 @@ export class Site {
     const t = this.time, run = g.run;
     const m = getMods(g), R = rates(g, m);
 
-    // mountain
+    // mountain (rebuilt when a new one is acquired)
+    const def = mtnDef(run);
+    if (this.mtnKey !== def.id + ':' + run.mtn.seed) this.buildMountain(def, run.mtn.seed);
     const frac = run.complete ? 1 : progress(g);
     const want = Math.floor(frac * this.total);
+    const before = this.removed;
     this.setRemoved(want, Math.abs(want - this.removed) < 400);
+    this.lastRemoved = Math.max(0, this.removed - before);
 
     // piles
     const ff = Math.min(1, run.face / faceCap(R, m)), yf = Math.min(1, run.yard / yardCap(R, m));
@@ -687,6 +761,13 @@ export class Site {
       this.beacon.position.set(this.hqBase.x, 0.6 + floors * 0.95 + 0.7, this.hqBase.z);
     }
     this.beacon.visible = Math.sin(t * 3) > -0.3;
+
+    // the volcano smokes (and spits) until it's mostly gone
+    if (def.shape === 'volcano' && frac < 0.85) {
+      const s = this.summit;
+      if (Math.random() < dt * 6) this.smoke.spawn(s.x + (Math.random() - 0.5) * 3, s.y + 0.5, s.z + (Math.random() - 0.5) * 3, 0.8, 2.2 + Math.random(), -0.4, 5, 1.6);
+      if (Math.random() < dt * 1.5) this.debris.spawn(s.x, s.y, s.z, (Math.random() - 0.5) * 6, 9 + Math.random() * 5, (Math.random() - 0.5) * 6, 1.6, 0.9, C.accent);
+    }
 
     this.debris.update(dt);
     this.smoke.update(dt);

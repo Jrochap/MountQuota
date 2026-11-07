@@ -2,7 +2,7 @@
 //  MOUNT QUOTA — DOM interface
 // ─────────────────────────────────────────────────────────────
 import {
-  GAME_TITLE, COMPANY, MOUNTAIN_NAME, ERAS, CATS, UNITS, RESEARCH, RESEARCH_BY_ID, RD_ROWS, SKILLS, SKILL_BY_ID,
+  GAME_TITLE, COMPANY, MOUNTAINS, MOUNTAIN_BY_ID, FX_LABEL, ERAS, CATS, UNITS, RESEARCH, RESEARCH_BY_ID, RD_ROWS, SKILLS, SKILL_BY_ID,
   EVENTS, NEWS, fxText, LEGACY_BONUS, PAR_YEARS,
 } from './data.js';
 import * as S from './sim.js';
@@ -16,6 +16,12 @@ const setText = (el, v) => { v = String(v); if (el.textContent !== v) el.textCon
 const setHTML = (el, v) => { if (el._html !== v) { el._html = v; el.innerHTML = v; } };
 const setClass = (el, v) => { if (el.className !== v) el.className = v; };
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+const modsText = def => {
+  const parts = Object.entries(def.mods).map(([k, v]) => `<b class="${v >= 1 ? 'up' : 'down'}">${esc(FX_LABEL[k])} ×${v}</b>`);
+  if (def.massX !== 1) parts.push(`<b class="${def.massX > 1 ? 'down' : 'up'}">Tonnage ×${fmt(Math.exp(Math.log(1e11) * (def.massX - 1)))}</b>`);
+  return parts.length ? parts.join(' ') : '<b>No modifiers. Just rock.</b>';
+};
 
 export class UI {
   constructor(root, game, actions) {
@@ -51,7 +57,7 @@ export class UI {
 
     <section class="mtn panel">
       <div class="mtn-row">
-        <span class="mname">${esc(MOUNTAIN_NAME.toUpperCase())}</span>
+        <span class="mname" id="mname"></span><span class="mmods mono" id="mmods"></span>
         <span class="mono" id="pct">0.00%</span><span class="dim">LIQUIDATED</span>
         <span class="sep"></span>
         <span class="dim">STRATUM</span><span id="strata"></span>
@@ -131,8 +137,13 @@ export class UI {
 
     // events
     this.root.addEventListener('click', e => this.onClick(e));
+    this.root.addEventListener('input', e => {
+      const k = e.target.dataset.vol; if (!k) return;
+      this.g.settings[k] = +e.target.value; this.actions.settings();
+    });
     this.bindBuyPress();
     this.buildTicker();
+    this.applyTicker();
     this.buildRD();
     this.buildFam();
     this.markAmt();
@@ -159,31 +170,38 @@ export class UI {
     }
     if (t.dataset.node) {
       const n = RESEARCH_BY_ID[t.dataset.node];
-      if (S.doResearch(this.g, n.id)) { this.toast(`RESEARCHED — ${n.name}`, fxText(n.fx)); this.update(true); }
+      if (!S.doResearch(this.g, n.id)) { if (S.researchState(this.g, n.id) === 'available') this.sfx('denied'); return; }
+      if (!n.fx.some(e => e.k === 'era')) this.sfx('research');
+      { this.toast(`RESEARCHED — ${n.name}`, fxText(n.fx)); this.update(true); }
       return;
     }
     if (t.dataset.skill) {
-      if (S.buySkill(this.g, t.dataset.skill)) { const s = SKILL_BY_ID[t.dataset.skill]; this.toast(`INHERITED — ${s.name}`, s.fxt(this.g.meta.skills[s.id])); this.update(true); }
+      if (S.buySkill(this.g, t.dataset.skill)) { this.sfx('skill'); const s = SKILL_BY_ID[t.dataset.skill]; this.toast(`INHERITED — ${s.name}`, s.fxt(this.g.meta.skills[s.id])); this.update(true); }
       return;
     }
     if (t.dataset.memo != null) {
       const out = S.resolveEvent(this.g, +t.dataset.memo);
+      this.sfx('memoPick');
       $('#memo').hidden = true;
       if (out) this.toast('BOARD DECISION', out);
       return;
     }
+    if (t.dataset.mtn) { S.pickMountain(this.g, t.dataset.mtn); this.sfx('select'); return this.renderEvolve(); }
     if (t.dataset.evolve != null) return this.evolveClick(t);
     if (t.dataset.act) return this.actions[t.dataset.act]?.(t);
     if (t.dataset.set) {
       const k = t.dataset.set, s = this.g.settings;
-      s[k] = !s[k]; this.actions.settings(); this.renderLedger(); return;
+      s[k] = !s[k]; this.actions.settings(); this.applyTicker(); this.renderLedger(); return;
     }
   }
+
+  sfx(name, ...a) { this.actions.sound?.play(name, ...a); }
 
   buy(btn) {
     const [cat, ei] = btn.dataset.buy.split(':');
     const ok = S.buyUnit(this.g, cat, +ei, this.g.settings.buyAmt);
     if (ok) this.flash(btn);
+    this.sfx(ok ? 'buy' : 'denied', cat);
     this.update(true);
     return ok;
   }
@@ -216,6 +234,9 @@ export class UI {
     addEventListener('blur', stop);
   }
 
+  applyTicker() { document.body.classList.toggle('no-ticker', !this.g.settings.ticker); }
+  refreshSound() { if (this.open === 'ledger') this.renderLedger(); }
+
   markAmt() {
     this.root.querySelectorAll('[data-amt]').forEach(b => b.classList.toggle('on', String(this.g.settings.buyAmt) === b.dataset.amt));
   }
@@ -225,6 +246,7 @@ export class UI {
     this.close();
     this.open = id;
     $(`#ov-${id}`).hidden = false;
+    this.sfx('open');
     if (id === 'ledger') this.renderLedger();
     if (id === 'fam') { this.renderEvolve(); const b = $('#fam-body'); b.scrollLeft = (b.scrollWidth - b.clientWidth) / 2; b.scrollTop = (b.scrollHeight - b.clientHeight) / 2; }
     this.update(true);
@@ -343,14 +365,23 @@ export class UI {
     const f = S.progress(g);
     $('#evolve').innerHTML = `
       <h3>EVOLVE THE DYNASTY</h3>
-      <p>The current heir is retired to a small island. Through a regrettable clerical error, ${esc(MOUNTAIN_NAME)} is restored to its original condition. The family remembers.</p>
+      <p>The current heir is retired to a small island. The board acquires a new mountain. The family remembers.</p>
       <dl>
         <dt>Liquidated</dt><dd class="mono">${pct(f)}</dd>
         <dt>Years this run</dt><dd class="mono">${yrs(r.complete ? r.finishYears : r.years)}</dd>
-        <dt>Best time</dt><dd class="mono">${yrs(g.meta.bestYears)}</dd>
+        <dt>Record here</dt><dd class="mono">${yrs(g.meta.records[S.mtnDef(r).id])}</dd>
+        <dt>Best anywhere</dt><dd class="mono">${yrs(g.meta.bestYears)}</dd>
         <dt>Runs</dt><dd class="mono">${g.meta.runs}</dd>
       </dl>
       <div class="gain">+◆${fmt(gain)} <span>LEGACY</span></div>
+      <h4>NEXT ACQUISITION — BOARD SURVEY</h4>
+      <div class="offer">${S.mountainOffer(g).map(id => {
+        const d = MOUNTAIN_BY_ID[id], rec = g.meta.records[id];
+        return `<button class="mcard ${g.meta.pick === id ? 'on' : ''}" data-mtn="${id}">
+          <span class="mc-n">${esc(d.name)}</span><span class="mc-b">${esc(d.blurb)}</span>
+          <span class="mc-m">${modsText(d)}</span>
+          <span class="mc-r mono">LEGACY ×${d.legacyX} · ${rec != null ? 'RECORD ' + yrs(rec) : 'UNMINED'}</span></button>`;
+      }).join('')}</div>
       <p class="dim small">Legacy = progress bonus (${pct(f, 0)} liquidated)${r.complete ? ' + completion bonus (faster = more)' : '. Finish the mountain for a large completion bonus; the faster, the bigger.'}</p>
       <button class="btn big ${gain > 0 ? '' : 'disabled'}" data-evolve>${this.armed ? 'CONFIRM — RESET THIS RUN' : 'EVOLVE ▶'}</button>
       <p class="dim small">You keep: Legacy, Family Tree, records. You lose: everything else, emotionally included.</p>`;
@@ -360,6 +391,7 @@ export class UI {
     if (!this.armed && !this.run.complete) { this.armed = true; this.renderEvolve(); setTimeout(() => { this.armed = false; if (this.open === 'fam') this.renderEvolve(); }, 4000); return; }
     this.armed = false;
     const gain = this.actions.evolve();
+    this.sfx('evolve');
     $('#ov-complete').hidden = true;
     this.unitKey = '';
     this.toast('THE DYNASTY EVOLVES', `+◆${fmt(gain)} Legacy. A new heir. The same mountain. Fresh optimism.`);
@@ -384,18 +416,24 @@ export class UI {
       </dl>
       <h3>DYNASTY RECORDS</h3>
       <dl class="grid">
-        <dt>Best liquidation</dt><dd>${yrs(m.bestYears)}</dd>
+        <dt>Best liquidation (any)</dt><dd>${yrs(m.bestYears)}</dd>
+        ${MOUNTAINS.map(d => `<dt>${esc(d.name)}</dt><dd>${m.records[d.id] != null ? yrs(m.records[d.id]) : '—'}</dd>`).join('')}
         <dt>Par</dt><dd>${PAR_YEARS} yrs</dd>
         <dt>Runs</dt><dd>${m.runs}</dd>
         <dt>Lifetime Legacy</dt><dd>◆${fmt(m.legacyTotal)}</dd>
       </dl>
-      ${m.history.length ? `<table class="hist"><tr><th>#</th><th>RESULT</th><th>YEARS</th><th>ERA</th><th>◆</th></tr>
-        ${m.history.map(h => `<tr><td>${h.run}</td><td>${h.complete ? 'LIQUIDATED' : 'ABANDONED ' + pct(h.pct, 0)}</td><td>${h.years.toFixed(1)}</td><td>${ERAS[h.era].roman}</td><td>${h.legacy}</td></tr>`).join('')}</table>` : ''}
+      ${m.history.length ? `<table class="hist"><tr><th>#</th><th>MOUNTAIN</th><th>RESULT</th><th>YEARS</th><th>ERA</th><th>◆</th></tr>
+        ${m.history.map(h => `<tr><td>${h.run}</td><td>${esc((MOUNTAIN_BY_ID[h.mtn] || MOUNTAINS[0]).name)}</td><td>${h.complete ? 'LIQUIDATED' : 'ABANDONED ' + pct(h.pct, 0)}</td><td>${h.years.toFixed(1)}</td><td>${ERAS[h.era].roman}</td><td>${h.legacy}</td></tr>`).join('')}</table>` : ''}
       <h3>SETTINGS</h3>
       <div class="chips">
-        ${tog('tilt', 'TILT-SHIFT')} ${tog('grain', 'FILM GRAIN')} ${tog('autoRotate', 'ORBIT CAMERA')} ${tog('offline', 'OFFLINE PROGRESS')}
+        ${tog('tilt', 'TILT-SHIFT')} ${tog('grain', 'FILM GRAIN')} ${tog('autoRotate', 'ORBIT CAMERA')} ${tog('offline', 'OFFLINE PROGRESS')} ${tog('ticker', 'NEWS TICKER')}
       </div>
       <p class="dim small">Offline progress simulates up to 8 hours while the game is closed. Years keep passing while you're away; the mountain does not care about your schedule.</p>
+      <h3>SOUND</h3>
+      <div class="chips">${tog('sound', 'SOUND')} <span class="dim small">Press M anywhere to toggle.</span></div>
+      <div class="sliders">
+        ${[['volume', 'MASTER'], ['sfxVol', 'EFFECTS'], ['ambVol', 'AMBIENCE']].map(([k, l]) => `<label><span>${l}</span><input type="range" min="0" max="1" step="0.05" value="${s[k]}" data-vol="${k}"></label>`).join('')}
+      </div>
       <h3>SAVE</h3>
       <div class="chips">
         <button class="chip" data-act="save">SAVE NOW</button>
@@ -450,7 +488,10 @@ export class UI {
     setText($('#pct'), pct(f, f < 0.1 ? 3 : 2));
     $('#pbar').style.width = (f * 100) + '%';
     setText($('#strata'), S.stratum(f).toUpperCase());
-    setText($('#density'), '×' + fmt(S.density(f)));
+    setText($('#density'), '×' + fmt(S.density(r, f)));
+    const def = S.mtnDef(r);
+    setText($('#mname'), def.name.toUpperCase());
+    setHTML($('#mmods'), modsText(def));
     setText($('#era-name'), `${ERAS[r.era].roman} · ${ERAS[r.era].name.toUpperCase()}`);
 
     setText($('#credits'), cr(r.credits));
@@ -511,9 +552,11 @@ export class UI {
   handle(ev) {
     if (ev.type === 'gen') {
       const t = ev.heir.trait;
+      this.sfx('gen');
       this.toast(`GENERATION ${S.roman(ev.heir.gen + 1)}`, `${ev.heir.name} inherits the company, the mountain and the debt. Trait: ${t.name}.`);
     } else if (ev.type === 'era') {
       const e = ERAS[ev.era];
+      this.sfx('leap');
       const b = $('#banner');
       b.innerHTML = `<div class="b-k">GENERATIONAL LEAP</div><div class="b-t">ERA ${e.roman} — ${esc(e.name.toUpperCase())}</div><div class="b-s">${esc(e.blurb)}</div>`;
       b.hidden = false; b.classList.remove('show'); void b.offsetWidth; b.classList.add('show');
@@ -525,22 +568,24 @@ export class UI {
       el.innerHTML = `<div class="memo-k">MEMO FROM THE BOARD</div><div class="memo-t">${esc(e.title)}</div><div class="memo-b">${esc(e.body)}</div>
         <div class="memo-o">${e.opts.map((o, i) => `<button class="btn" data-memo="${i}">${esc(o.label)}</button>`).join('')}</div>`;
       el.hidden = false;
+      this.sfx('memo');
     } else if (ev.type === 'complete') {
+      this.sfx('complete');
       this.showComplete();
     }
   }
   showComplete() {
     const g = this.g, r = this.run, gain = S.legacyGain(g);
-    const best = g.meta.bestYears;
+    const best = g.meta.records[S.mtnDef(r).id];
     const record = best == null || r.finishYears < best;
     $('#complete').innerHTML = `
       <div class="memo-k">NOTICE OF TOTAL LIQUIDATION</div>
-      <h2>${esc(MOUNTAIN_NAME.toUpperCase())} IS GONE.</h2>
+      <h2>${esc(S.mtnDef(r).name.toUpperCase())} IS GONE.</h2>
       <p>After <b>${r.finishYears.toFixed(1)} years</b> and <b>${r.gen + 1} generations</b>, the mountain has been fully converted into gravel, money, and a strongly worded documentary.</p>
-      ${record ? '<p class="acc"><b>NEW DYNASTY RECORD.</b> The family portrait has been updated.</p>' : `<p class="dim">Dynasty record: ${yrs(best)}.</p>`}
+      ${record ? '<p class="acc"><b>NEW RECORD FOR THIS MOUNTAIN.</b> The family portrait has been updated.</p>' : `<p class="dim">Dynasty record here: ${yrs(best)}.</p>`}
       <div class="gain">+◆${fmt(gain)} <span>LEGACY ON EVOLVE</span></div>
       <div class="memo-o">
-        <button class="btn big" data-evolve>EVOLVE THE DYNASTY ▶</button>
+        <button class="btn big" data-act="toEvolve">CHOOSE NEXT MOUNTAIN ▶</button>
         <button class="btn" data-act="admire">ADMIRE THE HOLE</button>
       </div>`;
     $('#ov-complete').hidden = false;

@@ -5,16 +5,37 @@
 
 export const GAME_TITLE = 'MOUNT QUOTA';
 export const COMPANY = 'Quarry & Descendants Ltd.';
-export const MOUNTAIN_NAME = 'Mt. Obstinate';
 
 export const SEC_PER_YEAR = 20;        // real seconds per in-game year
 export const GEN_YEARS = 25;           // years per generation (new CEO)
 // Rock gets denser with depth: volume fraction f costs M0·(e^(K·f) − 1) tons.
 export const MASS_K = Math.log(1e11);
 export const MASS_M0 = 6000;
-export const MOUNTAIN_MASS = MASS_M0 * (Math.exp(MASS_K) - 1);
+// ── Mountains (a new one is offered on each Evolution) ───────
+// shape: geometry generator in scene.js · palette: rock colours · massX scales MASS_K (×1.05 ≈ 3.5× the tonnage)
+export const MOUNTAINS = [
+  { id: 'obstinate', name: 'Mt. Obstinate', shape: 'peak', palette: 'granite', massX: 1, legacyX: 1, mods: {},
+    blurb: 'A perfectly ordinary mountain with an attitude problem.' },
+  { id: 'twins', name: 'The Twin Liabilities', shape: 'twin', palette: 'slate', massX: 1.07, legacyX: 1.1, mods: { value: 1.25, extraction: 0.85 },
+    blurb: 'Two peaks. Two faces. Twice the paperwork.' },
+  { id: 'mesa', name: 'Mesa Verde Capital', shape: 'mesa', palette: 'sandstone', massX: 0.93, legacyX: 1.05, mods: { mining: 1.4, value: 0.88 },
+    blurb: 'Flat on top, like the org chart. Soft rock, cheap rock.' },
+  { id: 'volcano', name: 'Mt. Overdraft (Active)', shape: 'volcano', palette: 'basalt', massX: 1.12, legacyX: 1.25, mods: { value: 1.6, mining: 0.75 },
+    blurb: 'Molten core. Insurance premiums also molten.' },
+  { id: 'ridge', name: 'The Long Grievance', shape: 'ridge', palette: 'shale', massX: 0.94, legacyX: 1.1, mods: { mining: 1.3, extraction: 0.75 },
+    blurb: 'A ridge so long the far end is in a different tax bracket.' },
+  { id: 'spire', name: 'Spire of Compliance', shape: 'spire', palette: 'quartz', massX: 1.05, legacyX: 1.15, mods: { mining: 0.8, rp: 1.4 },
+    blurb: 'Tall, thin and absolutely refuses to bend.' },
+  { id: 'ziggurat', name: 'Ziggurat of Unpaid Interns', shape: 'ziggurat', palette: 'limestone', massX: 1.03, legacyX: 1.1, mods: { rp: 1.5, processing: 0.85 },
+    blurb: 'Built by an ancient civilisation, for exposure.' },
+  { id: 'marble', name: 'Marble Arch-Nemesis', shape: 'dome', palette: 'marble', massX: 1.13, legacyX: 1.3, mods: { value: 2, mining: 0.65 },
+    blurb: 'Premium rock. Premium attitude. Chips if you look at it wrong.' },
+];
+export const MOUNTAIN_BY_ID = Object.fromEntries(MOUNTAINS.map(m => [m.id, m]));
+export const OFFER_SIZE = 3;
+
 export const STRATA = [
-  [0.00, 'Summit Snow (decorative)'], [0.08, 'Topsoil & Regret'], [0.2, 'Granite'], [0.35, 'Basalt'],
+  [0.00, 'The Summit (decorative)'], [0.08, 'Topsoil & Regret'], [0.2, 'Granite'], [0.35, 'Basalt'],
   [0.5, 'Bedrock'], [0.65, 'Suspiciously Dense Rock'], [0.8, 'Mantle-Adjacent'], [0.92, 'Pure Plot Armor'],
 ];
 export const BASE_VALUE = 1;           // credits per processed ton

@@ -5,6 +5,7 @@ import { Site } from './scene.js';
 import { UI } from './ui.js';
 import * as S from './sim.js';
 import { tons, fmt } from './format.js';
+import { Sound } from './audio.js';
 
 const KEY = 'mountquota.save.v1';
 const OFFLINE_CAP = 8 * 3600;
@@ -29,11 +30,25 @@ if (!g) g = S.newGame();
 window.game = g;
 
 let skipSave = false;
+const sound = new Sound(g.settings);
+window.sound = sound;
+// audio may only start from a user gesture
+const unlock = () => sound.unlock();
+addEventListener('pointerdown', unlock, true);
+addEventListener('keydown', unlock, true);
+addEventListener('keydown', e => {
+  if ((e.key === 'm' || e.key === 'M') && !e.metaKey && !e.ctrlKey && e.target.tagName !== 'INPUT') {
+    g.settings.sound = !g.settings.sound; sound.applyVolume();
+    ui.toast(g.settings.sound ? 'SOUND ON' : 'SOUND OFF', 'Press M to toggle.'); ui.refreshSound();
+  }
+});
+
 function save() { if (skipSave) return; try { localStorage.setItem(KEY, serialize(g)); } catch (e) { /* storage blocked */ } }
 
 const site = new Site(document.getElementById('scene'), {
   onMine: (x, y) => {
     const amt = S.clickMine(g);
+    sound.play(amt > 0 ? 'mine' : 'clogged');
     ui.floater(x, y, amt > 0 ? '+' + tons(amt) : 'FACE CLOGGED — HAUL IT');
     return amt;
   },
@@ -42,7 +57,9 @@ site.setSettings(g.settings);
 
 const ui = new UI(document.getElementById('ui'), g, {
   evolve: () => { const gain = S.evolve(g); save(); return gain; },
-  settings: () => site.setSettings(g.settings),
+  settings: () => { site.setSettings(g.settings); sound.applyVolume(); },
+  sound,
+  toEvolve: () => { document.getElementById('ov-complete').hidden = true; ui.show('fam'); },
   save: () => { save(); ui.toast('SAVED', 'The ledger has been notarised.'); },
   admire: () => { document.getElementById('ov-complete').hidden = true; },
   exportSave: () => {
@@ -89,6 +106,8 @@ function frame(now) {
 
   site.update(g, dt);
   site.render(dt);
+  sound.crumble(site.lastRemoved);
+  sound.update(g, dt);
 
   uiT += dt;
   if (uiT > 0.1) { uiT = 0; ui.update(); }
@@ -98,4 +117,4 @@ function frame(now) {
 }
 requestAnimationFrame(t => { last = t; ui.update(true); frame(t); });
 addEventListener('beforeunload', save);
-document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) save(); sound.suspend(document.hidden); });

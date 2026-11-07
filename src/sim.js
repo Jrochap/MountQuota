@@ -2,7 +2,7 @@
 //  MOUNT QUOTA — simulation core (pure logic, no DOM / three)
 // ─────────────────────────────────────────────────────────────
 import {
-  SEC_PER_YEAR, GEN_YEARS, MOUNTAIN_MASS, MASS_K, MASS_M0, STRATA, BASE_VALUE, RP_PER_TON, BUFFER_SECONDS, BUFFER_MIN,
+  SEC_PER_YEAR, GEN_YEARS, MASS_K, MASS_M0, STRATA, MOUNTAINS, MOUNTAIN_BY_ID, OFFER_SIZE, BASE_VALUE, RP_PER_TON, BUFFER_SECONDS, BUFFER_MIN,
   COST_GROWTH, LEGACY_BONUS, LEGACY_PROGRESS, LEGACY_COMPLETE, PAR_YEARS,
   CATS, UNITS, RESEARCH, RESEARCH_BY_ID, SKILLS, SKILL_BY_ID, TRUST_FUND,
   FIRST_NAMES, TRAITS, FOUNDER_TRAIT, EVENTS,
@@ -19,7 +19,7 @@ export function roman(n) {
 
 // ── Meta (persists across runs) ──────────────────────────────
 export function newMeta() {
-  return { legacy: 0, legacyTotal: 0, skills: { founder: 1 }, runs: 0, bestYears: null, history: [] };
+  return { legacy: 0, legacyTotal: 0, skills: { founder: 1 }, runs: 0, bestYears: null, records: {}, history: [], offer: null, pick: null };
 }
 
 // ── Run ──────────────────────────────────────────────────────
@@ -30,7 +30,25 @@ export function makeHeir(gen, meta) {
   return { name: `${pick(FIRST_NAMES)} Quarry ${roman(gen + 1)}`, gen, trait: pick(pool) };
 }
 
-export function newRun(meta) {
+// ── Mountains ────────────────────────────────────────────────
+export const mtnDef = r => MOUNTAIN_BY_ID[r.mtn?.id] || MOUNTAINS[0];
+export const massK = r => MASS_K * mtnDef(r).massX;
+export const massOf = r => MASS_M0 * (Math.exp(massK(r)) - 1);
+export function mountainOffer(g) {
+  const meta = g.meta;
+  if (!meta.offer || !meta.offer.every(id => MOUNTAIN_BY_ID[id])) {
+    const pool = MOUNTAINS.map(m => m.id).sort(() => Math.random() - 0.5);
+    // prefer mountains the dynasty hasn't liquidated yet
+    pool.sort((a, b) => (meta.records[a] != null) - (meta.records[b] != null));
+    meta.offer = pool.slice(0, OFFER_SIZE).sort(() => Math.random() - 0.5);
+    meta.pick = meta.offer[0];
+  }
+  if (!meta.offer.includes(meta.pick)) meta.pick = meta.offer[0];
+  return meta.offer;
+}
+export function pickMountain(g, id) { if (mountainOffer(g).includes(id)) g.meta.pick = id; }
+
+export function newRun(meta, mtnId = 'obstinate') {
   const units = {};
   for (const c of CAT_IDS) units[c] = UNITS[c].map(() => 0);
   for (const c of CAT_IDS) units[c][0] = 1;
@@ -46,6 +64,8 @@ export function newRun(meta) {
     complete: false, finishYears: null,
     flow: { mine: 0, haul: 0, proc: 0, cash: 0, rp: 0 },
     eraYears: [0],
+    // the very first mountain uses the classic seed; later ones are randomised
+    mtn: { id: mtnId, seed: meta.runs === 0 && mtnId === 'obstinate' ? 7 : 1 + Math.floor(Math.random() * 1e6) },
   };
   for (const n of RESEARCH) if (n.era < skip) run.research[n.id] = true;
   if (skip > 0) {
@@ -62,7 +82,7 @@ export function newGame() {
   return { meta, run: newRun(meta), settings: defaultSettings(), out: [] };
 }
 export function defaultSettings() {
-  return { tilt: true, tiltStrength: 1, offline: true, grain: true, buyAmt: 1, autoRotate: false };
+  return { tilt: true, tiltStrength: 1, offline: true, grain: true, buyAmt: 1, autoRotate: false, ticker: true, sound: true, volume: 0.7, sfxVol: 0.9, ambVol: 0.6 };
 }
 
 // ── Modifiers ────────────────────────────────────────────────
@@ -72,6 +92,7 @@ export function getMods(g) {
   for (const n of RESEARCH) if (r.research[n.id]) applyFx(m, n.fx);
   for (const s of SKILLS) { const l = meta.skills[s.id] || 0; if (l > 0 && s.apply) s.apply(m, l); }
   if (r.heir) for (const k in r.heir.trait.mods) m[k] *= r.heir.trait.mods[k];
+  const mm = mtnDef(r).mods; for (const k in mm) m[k] *= mm[k];
   for (const b of r.buffs) m[b.k] *= b.x;
   m.global *= 1 + LEGACY_BONUS * meta.legacyTotal;
   return m;
@@ -119,9 +140,10 @@ export function tick(g, dt, offline = false) {
   r.face -= haul; r.yard += haul;
 
   const capF = faceCap(R, m);
-  const mine = Math.max(0, Math.min(R.mining * dt, capF - r.face, MOUNTAIN_MASS - r.mined));
+  const MASS = massOf(r);
+  const mine = Math.max(0, Math.min(R.mining * dt, capF - r.face, MASS - r.mined));
   r.face += mine; r.mined += mine;
-  if (r.mined >= MOUNTAIN_MASS * (1 - 1e-12)) r.mined = MOUNTAIN_MASS;
+  if (r.mined >= MASS * (1 - 1e-12)) r.mined = MASS;
 
   // smoothed actual flows for the UI
   const a = clamp(dt * 1.5, 0, 1), f = r.flow;
@@ -151,7 +173,7 @@ export function tick(g, dt, offline = false) {
     if (r._autoT >= 0.5) { r._autoT = 0; autoBuy(g, m, R); }
   }
 
-  if (r.mined >= MOUNTAIN_MASS && r.face <= 0 && r.yard <= 0) {
+  if (r.mined >= MASS && r.face <= 0 && r.yard <= 0) {
     r.complete = true; r.finishYears = r.years;
     g.out.push({ type: 'complete' });
   }
@@ -244,7 +266,7 @@ export function clickMine(g) {
   const r = g.run;
   if (r.complete) return 0;
   const m = getMods(g), R = rates(g, m);
-  const amt = Math.max(0, Math.min(clickPower(g, m), faceCap(R, m) * 1.5 - r.face, MOUNTAIN_MASS - r.mined));
+  const amt = Math.max(0, Math.min(clickPower(g, m), faceCap(R, m) * 1.5 - r.face, massOf(r) - r.mined));
   r.face += amt; r.mined += amt; r.clicks++; r.clickTons += amt;
   return amt;
 }
@@ -270,21 +292,26 @@ export function resolveEvent(g, optIndex) {
 // ── Succession / prestige ────────────────────────────────────
 export function legacyGain(g) {
   const r = g.run;
-  const f = volumeFrac(r.mined);
-  let L = Math.floor(LEGACY_PROGRESS * Math.pow(f, 1.2));
-  if (r.complete) L += Math.floor(LEGACY_COMPLETE * Math.sqrt(clamp(PAR_YEARS / Math.max(0.5, r.finishYears), 0.25, 400)));
-  return L;
+  const f = volumeFrac(r);
+  let L = LEGACY_PROGRESS * Math.pow(f, 1.2);
+  if (r.complete) L += LEGACY_COMPLETE * Math.sqrt(clamp(PAR_YEARS / Math.max(0.5, r.finishYears), 0.25, 400));
+  return Math.floor(L * mtnDef(r).legacyX);
 }
 export function evolve(g) {
   const gain = legacyGain(g), r = g.run, meta = g.meta;
   meta.legacy += gain; meta.legacyTotal += gain; meta.runs++;
   if (r.complete && (meta.bestYears == null || r.finishYears < meta.bestYears)) meta.bestYears = r.finishYears;
+  const id = mtnDef(r).id;
+  if (r.complete && (meta.records[id] == null || r.finishYears < meta.records[id])) meta.records[id] = r.finishYears;
   meta.history.unshift({
     run: meta.runs, years: r.complete ? r.finishYears : r.years, complete: r.complete,
-    pct: volumeFrac(r.mined), legacy: gain, era: r.era, gens: r.gen + 1,
+    pct: volumeFrac(r), legacy: gain, era: r.era, gens: r.gen + 1, mtn: id,
   });
   meta.history = meta.history.slice(0, 30);
-  g.run = newRun(meta);
+  mountainOffer(g);
+  const next = meta.pick;
+  meta.offer = null; meta.pick = null;          // a fresh survey after every evolution
+  g.run = newRun(meta, next);
   return gain;
 }
 
@@ -302,9 +329,8 @@ export function buySkill(g, id) {
   return true;
 }
 
-export const volumeFrac = mined => mined >= MOUNTAIN_MASS ? 1 : Math.log(1 + mined / MASS_M0) / MASS_K;
-export const progress = g => volumeFrac(g.run.mined);
-export const massAt = f => MASS_M0 * (Math.exp(MASS_K * f) - 1);
+export const volumeFrac = r => r.mined >= massOf(r) ? 1 : Math.log(1 + r.mined / MASS_M0) / massK(r);
+export const progress = g => volumeFrac(g.run);
 export function stratum(f) { let s = STRATA[0][1]; for (const [a, n] of STRATA) if (f >= a) s = n; return s; }
-export function density(f) { return Math.exp(MASS_K * f); }
-export { CAT_IDS, MOUNTAIN_MASS };
+export const density = (r, f) => Math.exp(massK(r) * f);
+export { CAT_IDS };
