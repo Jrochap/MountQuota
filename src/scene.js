@@ -168,6 +168,61 @@ const SHAPES = {
     const c = Math.max(Math.abs(u), Math.abs(v)) / 0.82;
     return { h: c < 1 ? (Math.floor((1 - c) * 7) + 1) * 34 * 0.11 : 0 };
   },
+  monolith: (u, v, H, n1) => {
+    // a perfect slab with a slightly chamfered crown
+    const a = 0.35, uu = u * Math.cos(a) + v * Math.sin(a), vv = -u * Math.sin(a) + v * Math.cos(a);
+    const du = Math.abs(uu) / 0.42, dv = Math.abs(vv) / 0.72;
+    if (du > 1 || dv > 1) return { h: 0 };
+    const edge = Math.max(du, dv);
+    return { h: H * 0.8 - (edge > 0.9 ? (edge - 0.9) * 30 : 0) };
+  },
+  cluster: (u, v, H, n1, n2, x, z) => {
+    let h = 0;
+    for (let i = 0; i < 8; i++) {
+      const a = i * 2.39996, rr = i === 0 ? 0 : 0.28 + 0.45 * n1(i * 7.3, 1.7);
+      const cu = Math.cos(a) * rr, cv = Math.sin(a) * rr, size = 0.22 + 0.16 * n1(i * 3.1, 9.2);
+      const d = Math.hypot(u - cu, v - cv) / size;
+      h = Math.max(h, H * (0.32 + 0.3 * n1(i * 5.7, 4.4)) * Math.pow(pos0(1 - d), 1.2));
+    }
+    return { h: h > 0 ? h + (n2(x * 0.4, z * 0.4) - 0.5) * 2 : 0 };
+  },
+  arch: (u, v, H, n1, n2, x, z) => {
+    const a = -0.8, uu = u * Math.cos(a) + v * Math.sin(a), vv = -u * Math.sin(a) + v * Math.cos(a);
+    const jag = (n2(x * 0.4, z * 0.4) - 0.5) * 2.5;
+    // two pillars
+    const p1 = Math.hypot(uu + 0.55, vv * 1.2) / 0.3, p2 = Math.hypot(uu - 0.55, vv * 1.2) / 0.3;
+    const pillar = H * 0.78 * Math.pow(pos0(1 - Math.min(p1, p2)), 0.35);
+    // the bridge: a band floating between them (voxels from lo to h)
+    if (Math.abs(uu) < 0.58 && Math.abs(vv) < 0.16) {
+      const sag = 1 - Math.pow(uu / 0.58, 2);
+      const hi = H * 0.72 - sag * H * 0.06 + jag, lo = H * 0.5 - sag * H * 0.08;
+      if (pillar > lo) return { h: Math.max(pillar, hi) };
+      return { h: hi, lo };
+    }
+    const apron = H * 0.14 * Math.pow(pos0(1 - Math.hypot(uu / 1.05, vv / 0.5)), 1.4);
+    return { h: Math.max(pillar, apron) + (pillar > 1 ? jag : 0) };
+  },
+  glacier: (u, v, H, n1, n2, x, z) => {
+    const d = Math.hypot(u * 0.9, v * 1.1);
+    if (d >= 1) return { h: 0 };
+    const crevasse = Math.abs(n1(x * 0.09, z * 0.09) - 0.5) < 0.04 ? -4 : 0;
+    return { h: H * 0.5 * Math.pow(1 - d * d, 0.6) + (n2(x * 0.2, z * 0.2) - 0.5) * 3 + crevasse };
+  },
+  tilted: (u, v, H, n1, n2, x, z) => {
+    const a = 0.25, uu = u * Math.cos(a) + v * Math.sin(a), vv = -u * Math.sin(a) + v * Math.cos(a);
+    if (Math.abs(uu) > 0.78 || Math.abs(vv) > 0.62) return { h: 0 };
+    return { h: 2 + H * 1.05 * (0.78 - uu) / 1.56 + (n2(x * 0.5, z * 0.5) - 0.5) * 1.5 };
+  },
+  crystal: (u, v, H, n1, n2, x, z) => {
+    let h = H * 0.18 * Math.pow(pos0(1 - Math.hypot(u, v) / 0.95), 1.3);
+    for (let i = 0; i < 14; i++) {
+      const a = i * 2.39996, rr = i === 0 ? 0 : 0.12 + 0.62 * n1(i * 4.9, 2.3);
+      const cu = Math.cos(a) * rr, cv = Math.sin(a) * rr;
+      const d = Math.hypot(u - cu, v - cv) / (0.07 + 0.06 * n1(i * 2.2, 8.1));
+      h = Math.max(h, H * (0.5 + 0.75 * n1(i * 6.1, 3.3)) * (1 - rr * 0.5) * Math.pow(pos0(1 - d), 0.8));
+    }
+    return { h };
+  },
   dome: (u, v, H, n1, n2, x, z) => {
     const d = Math.hypot(u * 0.95, v * 1.05);
     return { h: d < 1 ? H * 0.6 * Math.sqrt(1 - d * d) + (n1(x * 0.15, z * 0.15) - 0.5) * 2.5 : 0 };
@@ -181,6 +236,12 @@ const PALETTES = {
   shale:     { strata: [0x7d7468, 0x8a8174, 0x6f675c, 0x978d7f], cap: C.white, ore: C.accent, oreRate: 0.02 },
   quartz:    { strata: [0xc9c6d2, 0xd8d5df, 0xbbb8c6, 0xe4e1ea], cap: 0xffffff, ore: C.accent, oreRate: 0.02 },
   limestone: { strata: [0xd6c9a8, 0xbfae88, 0xe0d4b6, 0xa8977a], cap: null, ore: C.accent, oreRate: 0.015, tiers: true },
+  concrete:  { strata: [0xa9a59e, 0xb4b0a8, 0x9d9992, 0xbcb8b0], cap: null, ore: C.accent, oreRate: 0.008 },
+  moss:      { strata: [0x7d8a6a, 0x8a957a, 0x6f7c5f, 0x96a085], cap: 0xe9ece2, ore: C.accent, oreRate: 0.02 },
+  rust:      { strata: [0x9a5a3c, 0xa8694a, 0x8a4e33, 0xb57a5a], cap: null, ore: 0xf0e6d8, oreRate: 0.02 },
+  ice:       { strata: [0xd8e4ea, 0xcad9e2, 0xe6eef2, 0xbfd0da], cap: 0xffffff, ore: 0x6aa7c4, oreRate: 0.03 },
+  coal:      { strata: [0x2f2f30, 0x3a3a3b, 0x262627, 0x444446], cap: null, ore: C.accent, oreRate: 0.03 },
+  amethyst:  { strata: [0x6d5a7a, 0x7c6889, 0x5f4e6b, 0x8a779a], cap: null, ore: 0xd9c6ef, oreRate: 0.09 },
   marble:    { strata: [0xeeeae3, 0xe2ddd4, 0xf6f3ee, 0xd8d2c8], cap: null, ore: 0x55524e, oreRate: 0.06 },
 };
 
@@ -364,9 +425,9 @@ export class Site {
     this.lava = [];
     for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
       const x = i - N / 2 + 0.5, z = j - N / 2 + 0.5;
-      const { h, lava } = shape(x / R, z / R, H, (a, b) => n1(a, b), (a, b) => n2(a, b), x, z);
+      const { h, lava, lo = 0 } = shape(x / R, z / R, H, (a, b) => n1(a, b), (a, b) => n2(a, b), x, z);
       const top = Math.max(0, Math.floor(h));
-      for (let y = 0; y < top; y++) vox.push({ x: x + cx, y, z: z + cz, top, lava: lava && y === top - 1, key: y + 0.06 * x + r() * 2.6 });
+      for (let y = Math.max(0, Math.floor(lo)); y < top; y++) vox.push({ x: x + cx, y, z: z + cz, top, lava: lava && y === top - 1, key: y + 0.06 * x + r() * 2.6 });
     }
     // removal order: highest key first (top-down, quarry face toward the yard)
     vox.sort((a, b) => b.key - a.key);

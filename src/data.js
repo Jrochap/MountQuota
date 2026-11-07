@@ -31,6 +31,20 @@ export const MOUNTAINS = [
   { id: 'marble', name: 'Marble Arch-Nemesis', shape: 'dome', palette: 'marble', massX: 1.08, legacyX: 1.3, mods: { value: 2, mining: 0.65 },
     blurb: 'Premium rock. Premium attitude. Chips if you look at it wrong.' },
 ];
+MOUNTAINS.push(
+  { id: 'monolith', name: 'The Monolith (Allegedly Natural)', shape: 'monolith', palette: 'concrete', massX: 0.98, legacyX: 1.1, mods: { extraction: 1.4, value: 0.85 },
+    blurb: 'Suspiciously rectangular. Geologists refuse to comment. Flat faces make hauling easy.' },
+  { id: 'foothills', name: 'The Foothills Collective', shape: 'cluster', palette: 'moss', massX: 0.92, legacyX: 1.05, mods: { mining: 1.2, extraction: 1.2, processing: 0.8 },
+    blurb: 'Seven small mountains in a trench coat.' },
+  { id: 'overpass', name: 'The Overpass', shape: 'arch', palette: 'rust', massX: 1.05, legacyX: 1.15, mods: { value: 1.3, mining: 0.85 },
+    blurb: 'A natural stone bridge. The council is already discussing tolls.' },
+  { id: 'permafrost', name: 'Mt. Permafrost (Melting)', shape: 'glacier', palette: 'ice', massX: 0.9, legacyX: 1.2, mods: { time: 0.95, processing: 0.75 },
+    blurb: 'Time moves slowly up here. So does everything else.' },
+  { id: 'leaning', name: 'The Leaning Liability', shape: 'tilted', palette: 'coal', massX: 0.94, legacyX: 1.1, mods: { mining: 1.25, rp: 0.8 },
+    blurb: 'Leans at 30 degrees. The insurance policy leans further.' },
+  { id: 'spikes', name: 'Spikes of Synergy', shape: 'crystal', palette: 'amethyst', massX: 1.08, legacyX: 1.25, mods: { value: 1.6, extraction: 0.8 },
+    blurb: 'Every rock is pointy. Every rock is premium. Every rock is a lawsuit.' },
+);
 export const MOUNTAIN_BY_ID = Object.fromEntries(MOUNTAINS.map(m => [m.id, m]));
 export const OFFER_SIZE = 3;
 

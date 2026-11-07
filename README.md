@@ -37,9 +37,10 @@ Add `?speed=20` to the URL to fast-forward while testing.
   satirical bio; if you don't choose within 30 seconds, the board picks for you. A good pick for your current
   bottleneck saves about 6 years per run. *Selective Succession* gives 4 candidates with their downsides halved.
 - **Board memos**: 25 random satirical events, some only in certain eras. They have 2–3 choices, including gambles, slowed years, free units and instant mining.
-- **Mountains**: 8 of them, each with its own shape, rock and trade-offs: Mt. Obstinate, The Twin Liabilities,
+- **Mountains**: 14 of them, each with its own shape, rock and trade-offs: Mt. Obstinate, The Twin Liabilities,
   Mesa Verde Capital, Mt. Overdraft (an active volcano), The Long Grievance (a ridge), Spire of Compliance,
-  Ziggurat of Unpaid Interns and Marble Arch-Nemesis. Each one changes the tonnage, gameplay modifiers and Legacy
+  Ziggurat of Unpaid Interns, Marble Arch-Nemesis, The Monolith (Allegedly Natural), The Foothills Collective,
+  The Overpass (a natural arch), Mt. Permafrost (Melting), The Leaning Liability and Spikes of Synergy. Each one changes the tonnage, gameplay modifiers and Legacy
   multiplier. On every Evolution the board offers 3 to pick from, and records are kept per mountain.
 - **Sound**: fully synthesized with Web Audio, so there are no asset files. One-shot effects, a concrete-hall reverb,
   an ambient bed per era and machinery rhythms that follow what you own. Press **M** to mute; volumes are in the Ledger.
@@ -75,5 +76,5 @@ python3 tools/balance.py all
 Random heir traits add noise of about ±5 years per run, so use `--trials 20` before trusting small differences.
 
 Current numbers: first run ≈ 115 years (~38 min of real time), with eras at years 12/23/37/58/86. The prestige curve goes
-111 → 74 → 49 → 40 → 28 → 24 → 16 → 13. All 8 mountains land between 110 and 119 years. About 37% of the output
+111 → 74 → 49 → 40 → 28 → 24 → 16 → 13. All 14 mountains land between about 104 and 121 years. About 37% of the output
 gained comes from buying older units. Gary's MBA runs about 11% faster than basic Gary.
