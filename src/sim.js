@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────────────────────
 import {
   SEC_PER_YEAR, GEN_YEARS, MASS_K, MASS_M0, STRATA, MOUNTAINS, MOUNTAIN_BY_ID, OFFER_SIZE, BASE_VALUE, RP_PER_TON, BUFFER_SECONDS, BUFFER_MIN,
-  COST_GROWTH, WORKFORCE, MILESTONES, MILESTONE_X, DEPRECIATION, GARY_SAVE_SECONDS, GARY_SAVE_ADVANTAGE, GARY_BALANCE, LEGACY_BONUS, LEGACY_PROGRESS, LEGACY_COMPLETE, PAR_YEARS,
+  DEFERRED_RATE, DEFERRED_CAP, OVERTIME_X, COST_GROWTH, WORKFORCE, MILESTONES, MILESTONE_X, DEPRECIATION, GARY_SAVE_SECONDS, GARY_SAVE_ADVANTAGE, GARY_BALANCE, LEGACY_BONUS, LEGACY_PROGRESS, LEGACY_COMPLETE, PAR_YEARS,
   CATS, UNITS, RESEARCH, RESEARCH_BY_ID, SKILLS, SKILL_BY_ID, TRUST_FUND,
   FIRST_NAMES, TRAITS, FOUNDER_TRAIT, softenTrait, EVENTS, SUCCESSION_SECONDS, HEIR_BIOS, BOARD_PICK_LINES,
 } from './data.js';
@@ -19,7 +19,7 @@ export function roman(n) {
 
 // ── Meta (persists across runs) ──────────────────────────────
 export function newMeta() {
-  return { legacy: 0, legacyTotal: 0, skills: { founder: 1 }, runs: 0, bestYears: null, records: {}, history: [], offer: null, pick: null };
+  return { legacy: 0, legacyTotal: 0, skills: { founder: 1 }, runs: 0, bestYears: null, records: {}, history: [], offer: null, pick: null, deferred: 0 };
 }
 
 // ── Run ──────────────────────────────────────────────────────
@@ -112,6 +112,7 @@ export function getMods(g) {
   if (r.heir) for (const k in r.heir.trait.mods) m[k] *= r.heir.trait.mods[k];
   const mm = mtnDef(r).mods; for (const k in mm) m[k] *= mm[k];
   for (const b of r.buffs) m[b.k] *= b.x;
+  if (r.overtime && meta.deferred > 0) m.global *= OVERTIME_X;
   m.global *= 1 + LEGACY_BONUS * meta.legacyTotal;
   return m;
 }
@@ -164,6 +165,10 @@ export function tick(g, dt, offline = false) {
   const R = rates(g, m);
   r.t += dt;
   r.years += (dt / SEC_PER_YEAR) * m.time;
+  if (r.overtime && !isDraining(r)) {          // the ×40 final-shipments phase doesn't burn the bank
+    g.meta.deferred = Math.max(0, g.meta.deferred - dt);
+    if (g.meta.deferred <= 0) { r.overtime = false; g.out.push({ type: 'overtimeEnd' }); }
+  }
 
   // processing first so the pipeline flows within one tick
   const proc = Math.min(R.processing * dt, r.yard);
@@ -223,6 +228,19 @@ export function tick(g, dt, offline = false) {
     r.complete = true; r.finishYears = r.years;
     g.out.push({ type: 'complete' });
   }
+}
+
+// ── Deferred Time ────────────────────────────────────────────
+// Real time away is banked instead of simulated, so it can never cost in-game years.
+export function bankDeferred(g, awaySeconds) {
+  const before = g.meta.deferred || 0;
+  g.meta.deferred = Math.min(DEFERRED_CAP, before + Math.max(0, awaySeconds) * DEFERRED_RATE);
+  return g.meta.deferred - before;
+}
+export function setOvertime(g, on) {
+  const r = g.run;
+  r.overtime = !!on && g.meta.deferred > 0 && !r.complete;
+  return r.overtime;
 }
 
 export function simulate(g, seconds, step = 1) {

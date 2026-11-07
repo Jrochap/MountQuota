@@ -64,6 +64,11 @@ export const LEGACY_BONUS = 0.005;     // +0.5% global output per lifetime Legac
 export const LEGACY_PROGRESS = 15;     // Legacy for progress: 15 × f^1.2
 export const LEGACY_COMPLETE = 10;     // completion bonus × sqrt(PAR / years)
 export const PAR_YEARS = 150;
+// Deferred Time: time away never adds years; it is banked (at a rate, capped) and spent as Overtime
+export const DEFERRED_RATE = 0.25;          // 1 hour away → 15 minutes of Overtime
+export const DEFERRED_CAP = 30 * 60;        // seconds of Overtime that can be banked
+export const OVERTIME_X = 2;                // all output while Overtime runs
+export const AWAY_THRESHOLD = 60;           // a hidden tab longer than this counts as "away"
 
 export const ERAS = [
   { name: 'Hands & Hope',            roman: 'I',   blurb: 'Pickaxes, wheelbarrows and an unshakeable belief in tomorrow.' },

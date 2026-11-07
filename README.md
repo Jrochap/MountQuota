@@ -43,6 +43,8 @@ Add `?speed=20` to the URL to fast-forward while testing.
   multiplier. On every Evolution the board offers 3 to pick from, and records are kept per mountain.
 - **Sound**: fully synthesized with Web Audio, so there are no asset files. One-shot effects, a concrete-hall reverb,
   an ambient bed per era and machinery rhythms that follow what you own. Press **M** to mute; volumes are in the Ledger.
+- **Time away**: no in-game years pass while you're away, so closing the tab never hurts your record. Time away is
+  banked as *Deferred Time* (25% of it, up to 30 minutes) and spent as *Overtime*: all output ×2 while it lasts.
 - **Evolve the Dynasty** (prestige): reset the run for Legacy ◆. You get a progress bonus, plus a completion bonus
   that grows the faster you finish. Spend Legacy in the **Family Tree**, a permanent skill tree with six branches
   (Bloodline, Logistics, Industry, Commerce, Academia, Bureaucracy). That includes era skips and *Calendar Reform*
@@ -56,7 +58,7 @@ Add `?speed=20` to the URL to fast-forward while testing.
 | `src/scene.js` | Three.js diorama: voxel mountain, per-era agents, yard, town, HQ, tilt-shift + grain post |
 | `src/ui.js` | DOM HUD, R&D tree, Family Tree, ledger, memos, ticker |
 | `src/audio.js` | Procedural sound: effects, per-era ambience, machinery rhythm |
-| `src/main.js` | Loop, save/load (localStorage), offline progress |
+| `src/main.js` | Loop, save/load (localStorage), Deferred Time on return |
 
 ## Balance
 `tools/balance.py` plays the real game logic (`src/data.js` + `src/sim.js`) headless with a greedy player.

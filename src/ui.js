@@ -48,6 +48,7 @@ export class UI {
         <div class="big mono" id="year">0000</div>
         <div class="heir"><b id="gen">GEN I</b> · <span id="heir"></span></div>
         <div class="trait" id="trait"></div>
+        <button class="ot" id="ot" hidden data-overtime title="Spend banked Deferred Time: all output ×2 while it lasts. Years pass normally.">◷ <span id="ot-v"></span> <b id="ot-l">OVERTIME</b></button>
       </div>
       <nav class="menu">
         <button class="btn" data-open="rd">R&amp;D TREE <em id="rd-badge"></em></button>
@@ -192,6 +193,7 @@ export class UI {
       if (S.buySkill(this.g, t.dataset.skill)) { this.sfx('skill'); const s = SKILL_BY_ID[t.dataset.skill]; this.toast(`INHERITED — ${s.name}`, s.fxt(this.g.meta.skills[s.id])); this.update(true); }
       return;
     }
+    if (t.dataset.overtime != null) { const on = S.setOvertime(this.g, !this.run.overtime); this.sfx(on ? 'leap' : 'select'); if (on) this.toast('OVERTIME AUTHORISED', 'All output ×2 until the Deferred Time bank runs dry. HR has been informed (HR is also working overtime).'); return this.update(true); }
     if (t.dataset.heir != null) { S.chooseHeir(this.g, +t.dataset.heir); return; }
     if (t.dataset.memo != null) {
       const out = S.resolveEvent(this.g, +t.dataset.memo);
@@ -524,9 +526,9 @@ export class UI {
         ${m.history.map(h => `<tr><td>${h.run}</td><td>${esc((MOUNTAIN_BY_ID[h.mtn] || MOUNTAINS[0]).name)}</td><td>${h.complete ? 'LIQUIDATED' : 'ABANDONED ' + pct(h.pct, 0)}</td><td>${h.years.toFixed(1)}</td><td>${ERAS[h.era].roman}</td><td>${h.legacy}</td></tr>`).join('')}</table>` : ''}
       <h3>SETTINGS</h3>
       <div class="chips">
-        ${tog('tilt', 'TILT-SHIFT')} ${tog('grain', 'FILM GRAIN')} ${tog('autoRotate', 'ORBIT CAMERA')} ${tog('offline', 'OFFLINE PROGRESS')} ${tog('ticker', 'NEWS TICKER')}
+        ${tog('tilt', 'TILT-SHIFT')} ${tog('grain', 'FILM GRAIN')} ${tog('autoRotate', 'ORBIT CAMERA')} ${tog('ticker', 'NEWS TICKER')}
       </div>
-      <p class="dim small">Offline progress simulates up to 8 hours while the game is closed. Years keep passing while you're away; the mountain does not care about your schedule.</p>
+      <p class="dim small">While you're away no in-game time passes, so closing the tab never hurts your record. Time away is banked as Deferred Time (25% of it, up to 30 minutes), which you spend as Overtime: all output ×2 for as long as it lasts. Use the ◷ button under the clock.</p>
       <h3>SOUND</h3>
       <div class="chips">${tog('sound', 'SOUND')} <span class="dim small">Press M anywhere to toggle.</span></div>
       <div class="sliders">
@@ -681,6 +683,15 @@ export class UI {
       const left = Math.max(0, Math.ceil(r.succession.deadline - r.t));
       const st = $('#succ-t'); if (st) setText(st, left + 's');
     } else if (!$('#succ').hidden) $('#succ').hidden = true;
+    const ot = $('#ot'), bank = meta.deferred || 0;
+    const showOt = (bank > 0.5 || r.overtime) && !r.complete;
+    if (ot.hidden === showOt) ot.hidden = !showOt;
+    if (showOt) {
+      const s = Math.ceil(bank), mm = Math.floor(s / 60);
+      setText($('#ot-v'), `${mm}:${String(s % 60).padStart(2, '0')}`);
+      setText($('#ot-l'), r.overtime ? 'OVERTIME ×2 · STOP' : 'START OVERTIME');
+      ot.classList.toggle('on', !!r.overtime);
+    }
     const dr = S.isDraining(r), de = $('#drain');
     if (r.clicks >= 6 || dr || r.complete) $('#hint').hidden = true;
     if (de.hidden === dr) de.hidden = !dr;
@@ -712,6 +723,8 @@ export class UI {
         <div class="memo-o">${e.opts.map((o, i) => `<button class="btn" data-memo="${i}">${esc(o.label)}</button>`).join('')}</div>`;
       el.hidden = false;
       this.sfx('memo');
+    } else if (ev.type === 'overtimeEnd') {
+      this.toast('OVERTIME OVER', 'The Deferred Time bank is empty. The workers collapse into a well-earned 4-minute break.');
     } else if (ev.type === 'milestone') {
       this.sfx('research');
       this.toast(`MILESTONE — ${ev.count} × ${UNITS[ev.cat][ev.e].name}`, `${ev.text} Output ×2.`);

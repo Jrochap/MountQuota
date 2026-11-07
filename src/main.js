@@ -6,6 +6,7 @@ import { UI } from './ui.js';
 import * as S from './sim.js';
 import { tons, fmt } from './format.js';
 import { Sound } from './audio.js';
+import { AWAY_THRESHOLD } from './data.js';
 
 const KEY = 'mountquota.save.v1';
 const OFFLINE_CAP = 8 * 3600;
@@ -78,16 +79,15 @@ const ui = new UI(document.getElementById('ui'), g, {
   },
 });
 
-// offline progress
-if (savedAt && g.settings.offline) {
-  const away = Math.min(OFFLINE_CAP, (Date.now() - savedAt) / 1000);
-  if (away > 10 && !g.run.complete) {
-    const y0 = g.run.years, m0 = g.run.mined, c0 = g.run.credits;
-    S.simulate(g, away, 1);
-    g.out = g.out.filter(e => e.type !== 'event');
-    ui.toast('WHILE YOU WERE AWAY', `${(g.run.years - y0).toFixed(1)} years passed. ${tons(g.run.mined - m0)} liquidated, ₵${fmt(Math.max(0, g.run.credits - c0))} banked.`);
-  }
+// time away never costs years: it is banked as Deferred Time (spent as Overtime)
+function awayFor(seconds) {
+  if (seconds <= 10) return;
+  const got = S.bankDeferred(g, seconds);
+  if (got > 0) ui.toast('WHILE YOU WERE AWAY', `No time passed. The workers stood perfectly still and saved up ${clockStr(got)} of Overtime (bank ${clockStr(g.meta.deferred)}).`);
+  else ui.toast('WHILE YOU WERE AWAY', 'No time passed. The Overtime bank is already full.');
 }
+const clockStr = s => { s = Math.round(s); const m = Math.floor(s / 60); return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}:${String(s % 60).padStart(2, '0')}`; };
+if (savedAt) awayFor(Math.min(OFFLINE_CAP, (Date.now() - savedAt) / 1000));
 if (g.run.complete) ui.showComplete();
 if (g.run.event) ui.handle({ type: 'event', id: g.run.event });
 
@@ -95,7 +95,10 @@ if (g.run.event) ui.handle({ type: 'event', id: g.run.event });
 let last = performance.now(), uiT = 0, saveT = 0;
 function frame(now) {
   let dt = (now - last) / 1000; last = now;
-  if (dt > 1) {                      // tab was hidden: catch up in coarse steps
+  if (dt > AWAY_THRESHOLD) {         // tab was hidden for a while: treat it as being away
+    awayFor(dt);
+    dt = 0.016;
+  } else if (dt > 1) {               // brief hide: catch up in coarse steps
     S.simulate(g, dt * SPEED, 0.5);
     dt = 0.016;
   } else {
