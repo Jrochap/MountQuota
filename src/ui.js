@@ -88,6 +88,10 @@ export class UI {
         ${[1, 10, 100, 'max'].map(a => `<button class="chip" data-amt="${a}">${a === 'max' ? 'MAX' : '×' + a}</button>`).join('')}
         <span class="buffs" id="buffs"></span>
       </div>
+      <div class="gary" id="gary" hidden>
+        <b class="g-name" id="gary-n">GARY</b><span class="g-t" id="gary-t"></span>
+        <label class="g-b" id="gary-b" title="Share of your credits Gary may spend">BUDGET <input type="range" min="0.1" max="1" step="0.05" data-budget><span class="mono" id="gary-bv"></span></label>
+      </div>
       <div class="units" id="units"></div>
     </aside>
 
@@ -101,6 +105,7 @@ export class UI {
       <div class="ov-panel panel">
         <div class="ov-head">
           <h2>R&amp;D — RESEARCH &amp; DOWNSIZING</h2>
+          <div class="rdauto" id="rd-auto"></div>
           <div class="ov-stat mono" id="rd-rp"></div>
           <button class="x btn" data-close>✕</button>
         </div>
@@ -138,6 +143,7 @@ export class UI {
     // events
     this.root.addEventListener('click', e => this.onClick(e));
     this.root.addEventListener('input', e => {
+      if (e.target.dataset.budget != null) { this.g.settings.garyBudget = +e.target.value; setText($('#gary-bv'), Math.round(this.g.settings.garyBudget * 100) + '%'); return; }
       const k = e.target.dataset.vol; if (!k) return;
       this.g.settings[k] = +e.target.value; this.actions.settings();
     });
@@ -189,9 +195,10 @@ export class UI {
     if (t.dataset.mtn) { S.pickMountain(this.g, t.dataset.mtn); this.sfx('select'); return this.renderEvolve(); }
     if (t.dataset.evolve != null) return this.evolveClick(t);
     if (t.dataset.act) return this.actions[t.dataset.act]?.(t);
+    if (t.dataset.rprio) { this.g.settings.researchPriority = t.dataset.rprio; this.sfx('select'); return this.renderRdAuto(); }
     if (t.dataset.set) {
       const k = t.dataset.set, s = this.g.settings;
-      s[k] = !s[k]; this.actions.settings(); this.applyTicker(); this.renderLedger(); return;
+      s[k] = !s[k]; this.actions.settings(); this.applyTicker(); this.renderLedger(); this.renderRdAuto(); return;
     }
   }
 
@@ -234,6 +241,13 @@ export class UI {
     addEventListener('blur', stop);
   }
 
+  renderRdAuto() {
+    const el = $('#rd-auto'), m = S.getMods(this.g), s = this.g.settings;
+    if (!m.autoResearch) { setHTML(el, ''); return; }
+    const P = [['cheapest', 'BALANCED', 'Cheapest first. Fastest overall.'], ['leaps', 'RUSH LEAPS', 'Generational Leaps first. Skips cheap multipliers, so usually slower.'], ['commerce', 'COMMERCE FIRST', 'Credits & doctrine first.']];
+    setHTML(el, `<b>GARY JR.</b><button class="chip ${s.autoResearch ? 'on' : ''}" data-set="autoResearch">${s.autoResearch ? 'ON' : 'OFF'}</button>
+      ${P.map(([k, l, tip]) => `<button class="chip ${s.researchPriority === k ? 'on' : ''}" data-rprio="${k}" title="${tip}">${l}</button>`).join('')}<span class="mono dim" id="rd-auto-t"></span>`);
+  }
   applyTicker() { document.body.classList.toggle('no-ticker', !this.g.settings.ticker); }
   refreshSound() { if (this.open === 'ledger') this.renderLedger(); }
 
@@ -248,6 +262,7 @@ export class UI {
     $(`#ov-${id}`).hidden = false;
     this.sfx('open');
     if (id === 'ledger') this.renderLedger();
+    if (id === 'rd') this.renderRdAuto();
     if (id === 'fam') { this.renderEvolve(); const b = $('#fam-body'); b.scrollLeft = (b.scrollWidth - b.clientWidth) / 2; b.scrollTop = (b.scrollHeight - b.clientHeight) / 2; }
     this.update(true);
   }
@@ -313,7 +328,7 @@ export class UI {
     tree.style.width = SZ + 'px'; tree.style.height = (SZ - 300) + 'px';
     const yOff = -150;
     const pos = s => {
-      const a = -Math.PI / 2 + s.dir * Math.PI / 3;
+      const a = -Math.PI / 2 + s.dir * Math.PI / 3 + (s.da || 0);
       return { x: C + Math.cos(a) * s.d * STEP * 1.25, y: C + yOff + Math.sin(a) * s.d * STEP };
     };
     let svg = `<svg class="links" width="100%" height="100%">`;
@@ -558,6 +573,24 @@ export class UI {
     const famAff = SKILLS.filter(s => s.id !== 'founder' && S.skillState(g, s.id) === 'affordable').length;
     setText($('#fam-badge'), famAff ? famAff : (gain > 0 && f > 0.25 ? '◆' : ''));
 
+    // Gary status
+    const gb = $('#gary');
+    gb.hidden = !m.auto;
+    if (m.auto) {
+      setText($('#gary-n'), m.smartBuy ? "GARY, MBA" : 'GARY');
+      const st = r.gary, anyOn = Object.values(r.autoOn).some(Boolean);
+      const txt = !anyOn ? 'Idle — switch a department to AUTO.' : st ? st.text + (st.eta != null && isFinite(st.eta) ? ` · ${Math.ceil(st.eta)}s` : '') : 'Reviewing the catalogue…';
+      setText($('#gary-t'), txt);
+      gb.classList.toggle('saving', st?.mode === 'saving');
+      $('#gary-b').hidden = !m.smartBuy;
+      const inp = $('[data-budget]', gb);
+      if (m.smartBuy && document.activeElement !== inp && +inp.value !== g.settings.garyBudget) inp.value = g.settings.garyBudget;
+      setText($('#gary-bv'), Math.round(g.settings.garyBudget * 100) + '%');
+    }
+    if (this.open === 'rd') {
+      const jt = $('#rd-auto-t');
+      if (jt) setText(jt, r.garyJr ? r.garyJr.text + (r.garyJr.eta != null && isFinite(r.garyJr.eta) ? ` · ${Math.ceil(r.garyJr.eta)}s` : '') : '');
+    }
     if (this.open === 'rd') this.updateRD();
     if (this.open === 'fam') { this.updateFam(); if (force) this.renderEvolve(); }
     if (r.clicks >= 6) $('#hint').hidden = true;

@@ -20,6 +20,12 @@ Add `?speed=20` to the URL to fast-forward while testing.
   - *Milestones*: owning 25, 50, 100, 200 or 400 of a unit doubles its output each time.
   - *Clearance*: obsolete units are 98% cheaper for each era they're behind.
   - Each buy button shows exactly how many t/s that purchase adds.
+- **Gary** (auto-buy) has a career path in the Family Tree's Bureaucracy branch:
+  - *Procurement Instinct*: basic Gary.
+  - *Gary's MBA* (◆40): buys in bundles to reach milestones, keeps the pipeline balanced and saves up for big buys,
+    with a budget slider. About 11% faster runs than basic Gary.
+  - *Gary Jr.* (◆120): auto-research with Balanced, Rush Leaps or Commerce First priority. Balanced keeps pace
+    with a perfect manual player.
 - **Density**: rock gets exponentially denser with depth, so every % of the mountain costs more than the last.
 - **R&D tree**: 6 eras × 7 rows. Each *Generational Leap* unlocks the next era of equipment:
   Hands & Hope → Steam & Soot → Diesel & Quarterly Reports → Silicon & Severance → Lasers & Liability → Post-Physical Synergy.

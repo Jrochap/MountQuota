@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────────────────────
 import {
   SEC_PER_YEAR, GEN_YEARS, MASS_K, MASS_M0, STRATA, MOUNTAINS, MOUNTAIN_BY_ID, OFFER_SIZE, BASE_VALUE, RP_PER_TON, BUFFER_SECONDS, BUFFER_MIN,
-  COST_GROWTH, WORKFORCE, MILESTONES, MILESTONE_X, DEPRECIATION, LEGACY_BONUS, LEGACY_PROGRESS, LEGACY_COMPLETE, PAR_YEARS,
+  COST_GROWTH, WORKFORCE, MILESTONES, MILESTONE_X, DEPRECIATION, GARY_SAVE_SECONDS, GARY_SAVE_ADVANTAGE, GARY_BALANCE, LEGACY_BONUS, LEGACY_PROGRESS, LEGACY_COMPLETE, PAR_YEARS,
   CATS, UNITS, RESEARCH, RESEARCH_BY_ID, SKILLS, SKILL_BY_ID, TRUST_FUND,
   FIRST_NAMES, TRAITS, FOUNDER_TRAIT, EVENTS,
 } from './data.js';
@@ -82,13 +82,13 @@ export function newGame() {
   return { meta, run: newRun(meta), settings: defaultSettings(), out: [] };
 }
 export function defaultSettings() {
-  return { tilt: true, tiltStrength: 1, offline: true, grain: true, buyAmt: 1, autoRotate: false, ticker: true, sound: true, volume: 0.7, sfxVol: 0.9, ambVol: 0.6 };
+  return { garyBudget: 1, autoResearch: true, researchPriority: 'cheapest', tilt: true, tiltStrength: 1, offline: true, grain: true, buyAmt: 1, autoRotate: false, ticker: true, sound: true, volume: 0.7, sfxVol: 0.9, ambVol: 0.6 };
 }
 
 // ── Modifiers ────────────────────────────────────────────────
 export function getMods(g) {
   const r = g.run, meta = g.meta;
-  const m = { mining: 1, extraction: 1, processing: 1, value: 1, rp: 1, buffer: 1, click: 1, global: 1, time: 1, auto: false };
+  const m = { mining: 1, extraction: 1, processing: 1, value: 1, rp: 1, buffer: 1, click: 1, global: 1, time: 1, auto: false, smartBuy: false, autoResearch: false };
   for (const n of RESEARCH) if (r.research[n.id]) applyFx(m, n.fx);
   for (const s of SKILLS) { const l = meta.skills[s.id] || 0; if (l > 0 && s.apply) s.apply(m, l); }
   if (r.heir) for (const k in r.heir.trait.mods) m[k] *= r.heir.trait.mods[k];
@@ -188,8 +188,12 @@ export function tick(g, dt, offline = false) {
   // auto-buy (Gary)
   if (m.auto) {
     r._autoT = (r._autoT || 0) + dt;
-    if (r._autoT >= 0.5) { r._autoT = 0; autoBuy(g, m, R); }
-  }
+    if (r._autoT >= 0.5) { r._autoT = 0; if (m.smartBuy) smartBuy(g, m); else autoBuy(g, m, R); }
+  } else r.gary = null;
+  if (m.autoResearch && g.settings?.autoResearch !== false) {
+    r._resT = (r._resT || 0) + dt;
+    if (r._resT >= 1) { r._resT = 0; autoResearch(g); }
+  } else r.garyJr = null;
 
   if (r.mined >= MASS && r.face <= 0 && r.yard <= 0) {
     r.complete = true; r.finishYears = r.years;
@@ -262,6 +266,80 @@ export function autoBuy(g, m, R) {
     }
     if (!bought) break;
     cats.sort((a, b) => R[a] - R[b]);
+  }
+}
+
+// ── Gary's MBA: smart auto-buy ───────────────────────────────
+// Considers single units AND "buy up to the next milestone" bundles, weights departments so the
+// pipeline stays balanced, and will wait a few seconds for a clearly better deal.
+export function smartBuy(g, m) {
+  const r = g.run, s = g.settings || {};
+  const cats = CAT_IDS.filter(c => r.autoOn[c]);
+  if (!cats.length) { r.gary = { mode: 'idle', text: 'All departments set to manual.' }; return; }
+  const reserve = r.credits * (1 - (s.garyBudget ?? 1));
+  const income = Math.max(0, r.flow.cash);
+  let status = null;
+  for (let guard = 0; guard < 40; guard++) {
+    const R = rates(g, m);
+    const minR = Math.min(...cats.map(c => R[c]));
+    const budget = r.credits - reserve;
+    let best = null, bestAff = null;
+    for (const c of cats) {
+      // throughput is capped by the weakest department, so output added elsewhere is discounted in
+      // proportion to its lead (not zeroed: cheap units there still pay off via workforce & milestones).
+      // Linear beat squared/flat weightings in the balance sim.
+      const lead = R[c] / Math.max(minR, 1e-9);
+      const w = lead <= GARY_BALANCE ? 1 : Math.max(1e-4, GARY_BALANCE / lead);
+      for (let e = 0; e <= r.era; e++) {
+        const own = r.units[c][e], nx = nextMilestone(own);
+        const opts = [1];
+        if (nx && nx[0] - own > 1 && nx[0] - own <= 40) opts.push(nx[0] - own);
+        for (const n of opts) {
+          const cost = unitCost(g, c, e, n);
+          const score = gainOf(g, c, e, n, m) / cost * w;
+          const o = { c, e, n, cost, score };
+          if (!best || score > best.score) best = o;
+          if (cost <= budget && (!bestAff || score > bestAff.score)) bestAff = o;
+        }
+      }
+    }
+    if (!best) break;
+    // save up if the best deal is close and clearly better than what we can afford right now
+    if (best !== bestAff && best.cost > budget) {
+      const eta = income > 0 ? (best.cost - budget) / income : Infinity;
+      if (eta <= GARY_SAVE_SECONDS && (!bestAff || best.score > bestAff.score * GARY_SAVE_ADVANTAGE)) {
+        status = { mode: 'saving', text: `Saving for ${best.n > 1 ? best.n + '× ' : ''}${UNITS[best.c][best.e].name}${best.n > 1 ? ' (milestone ×2)' : ''}`, eta };
+        break;
+      }
+    }
+    if (!bestAff) { status = status || { mode: 'idle', text: 'Waiting for credits.' }; break; }
+    r.credits -= bestAff.cost;
+    buyCount(g, bestAff.c, bestAff.e, bestAff.n);
+    status = { mode: 'buying', text: `Bought ${bestAff.n > 1 ? bestAff.n + '× ' : ''}${UNITS[bestAff.c][bestAff.e].name}` };
+  }
+  if (status) r.gary = status;
+}
+
+// ── Gary Jr.: auto-research ──────────────────────────────────
+const RD_RANK = {
+  leaps:    n => (n.row === 6 ? 0 : n.row <= 2 ? 1 : 2),
+  commerce: n => (n.row === 3 || n.row === 4 ? 0 : n.row === 6 ? 1 : 2),
+  cheapest: () => 0,
+};
+export function autoResearch(g) {
+  const r = g.run, rank = RD_RANK[g.settings?.researchPriority] || RD_RANK.leaps;
+  for (let guard = 0; guard < 10; guard++) {
+    const open = RESEARCH.filter(n => !r.research[n.id] && n.req.every(q => r.research[q]));
+    if (!open.length) { r.garyJr = { text: 'Nothing left to research.' }; return; }
+    open.sort((a, b) => rank(a) - rank(b) || a.cost - b.cost);
+    const target = open[0];
+    if (r.rp >= target.cost) { doResearch(g, target.id); r.garyJr = { text: `Researched ${target.name}` }; continue; }
+    // while saving for the priority target, only pick up trivially cheap nodes
+    const filler = open.find(n => n !== target && n.cost <= r.rp && n.cost < target.cost * 0.05);
+    if (filler) { doResearch(g, filler.id); continue; }
+    const eta = r.flow.rp > 0 ? (target.cost - r.rp) / r.flow.rp : Infinity;
+    r.garyJr = { text: `Saving for ${target.name}`, eta };
+    return;
   }
 }
 

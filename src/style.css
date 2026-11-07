@@ -296,3 +296,20 @@ body.no-ticker .memo { bottom: 100px; }
 .u-tags .t-ms { background: var(--acc); border-color: var(--acc); color: #fff; }
 .u-tags .t-cl { border-color: var(--good); color: var(--good); }
 .u-tags .t-nx { color: var(--mute); }
+
+/* ── Gary ── */
+.gary { display: flex; gap: 8px; align-items: center; padding: 6px 10px; border-bottom: 2px solid var(--ink); font-size: 11px; background: var(--paper-2); flex-wrap: wrap; }
+.gary[hidden] { display: none; }
+.gary .g-name { font-size: 10px; letter-spacing: .1em; background: var(--ink); color: var(--paper); padding: 1px 6px; }
+.gary .g-t { font-family: var(--f-mono); font-size: 10px; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gary.saving .g-t { color: var(--acc); }
+.gary .g-b { display: flex; gap: 6px; align-items: center; font-size: 9px; font-weight: 700; letter-spacing: .08em; }
+.gary .g-b[hidden] { display: none; }
+.gary .g-b input { width: 80px; accent-color: var(--acc); }
+.rdauto { display: flex; gap: 6px; align-items: center; margin-left: 18px; font-size: 11px; flex-wrap: wrap; }
+.rdauto:empty { display: none; }
+.rdauto b { color: var(--acc); letter-spacing: .1em; }
+.rdauto .chip { border-color: var(--paper); color: var(--paper); }
+.rdauto .chip.on { background: var(--acc); border-color: var(--acc); }
+.rdauto .chip:hover { background: #333; }
+.rdauto .dim { color: #a9a49a; font-size: 10px; }

@@ -54,6 +54,10 @@ export const MILESTONES = [
   [400, 'They have filed for statehood.'],
 ];
 export const MILESTONE_X = 2;
+// Gary's MBA: wait for a better deal if it's this many seconds of income away and this much better
+export const GARY_SAVE_SECONDS = 10;
+export const GARY_SAVE_ADVANTAGE = 1.3;
+export const GARY_BALANCE = 1.1;         // departments within 10% of the weakest get full priority
 // Depreciation: obsolete equipment goes on clearance — price × this per era behind the current one
 export const DEPRECIATION = 0.02;
 export const LEGACY_BONUS = 0.005;     // +0.5% global output per lifetime Legacy
@@ -255,7 +259,11 @@ export const SKILLS = [
     apply: (m, l) => { m.time *= Math.pow(0.9, l); }, fxt: l => `Years pass ×${(0.9 ** l).toFixed(3)}` },
   { id: 'procure', name: 'Procurement Instinct', desc: 'Every heir is born with a corporate card.', dir: 5, d: 2, max: 1, cost: () => 20, req: [['calendar', 1]],
     apply: m => { m.auto = true; }, fxt: () => 'Auto-buy from the start' },
-  { id: 'breeding', name: 'Selective Succession', desc: 'Heirs chosen by merit. Merit defined by the board.', dir: 5, d: 3, max: 1, cost: () => 60, req: [['procure', 1]],
+  { id: 'mba', name: "Gary's MBA", desc: 'Gary went back to school. He now plans purchases, chases milestones, balances the pipeline and saves up for big buys.', dir: 5, d: 3, max: 1, cost: () => 40, req: [['procure', 1]],
+    apply: m => { m.smartBuy = true; }, fxt: () => 'Smart auto-buy + budget control' },
+  { id: 'garyjr', name: 'Gary Jr.', desc: "Gary's son. Nobody interviewed him. Buys research automatically, by a priority you set.", dir: 5, d: 4, max: 1, cost: () => 120, req: [['mba', 1]],
+    apply: m => { m.autoResearch = true; }, fxt: () => 'Auto-research' },
+  { id: 'breeding', name: 'Selective Succession', desc: 'Heirs chosen by merit. Merit defined by the board.', dir: 5, d: 2.45, da: 0.5, max: 1, cost: () => 60, req: [['procure', 1]],
     fxt: () => 'Heirs always get a good trait' },
 ];
 export const SKILL_BY_ID = Object.fromEntries(SKILLS.map(s => [s.id, s]));
