@@ -322,3 +322,10 @@ body.no-ticker .memo { bottom: 100px; }
 .zoomer .chip { border-color: var(--paper); color: var(--paper); padding: 1px 7px; }
 .zoomer .chip:hover { background: #333; }
 .zoomer .z-v { font-size: 10px; color: #a9a49a; min-width: 34px; text-align: center; }
+
+/* ── final shipments fast-forward ── */
+.drain { position: absolute; left: calc((100% - var(--ops-w)) / 2); transform: translateX(-50%); top: 150px; background: var(--acc); color: #fff; padding: 7px 12px; font-size: 12px; font-weight: 700; letter-spacing: .08em; border: 2px solid var(--ink); box-shadow: var(--shadow); white-space: nowrap; pointer-events: none !important; }
+.drain[hidden] { display: none; }
+.drain b { background: var(--ink); padding: 0 5px; margin-right: 6px; animation: pulse 1s infinite; }
+.drain span { font-size: 10px; opacity: .9; margin-left: 6px; }
+@media (max-width: 980px) { .drain { left: 50%; white-space: normal; width: calc(100% - 28px); } }

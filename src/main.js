@@ -99,7 +99,8 @@ function frame(now) {
     S.simulate(g, dt * SPEED, 0.5);
     dt = 0.016;
   } else {
-    let left = dt * SPEED;
+    // once the last block is mined, fast-forward the final hauling/processing (years still count)
+    let left = dt * SPEED * (S.isDraining(g.run) ? S.DRAIN_SPEED : 1);
     while (left > 1e-6) { const s = Math.min(0.1, left); S.tick(g, s); left -= s; }
   }
   while (g.out.length) ui.handle(g.out.shift());

@@ -26,8 +26,10 @@ Add `?speed=20` to the URL to fast-forward while testing.
   - *Procurement Instinct*: basic Gary.
   - *Gary's MBA* (◆40): buys in bundles to reach milestones, keeps the pipeline balanced and saves up for big buys,
     with a budget slider. About 11% faster runs than basic Gary.
-  - *Gary Jr.* (◆120): auto-research with Balanced, Rush Leaps or Commerce First priority. Balanced keeps pace
-    with a perfect manual player.
+  - *Gary Jr.* (◆60, needs Procurement Instinct): auto-research from the start of every run, with Balanced,
+    Rush Leaps or Commerce First priority. Balanced keeps pace with a perfect manual player.
+- **Strategic Planning Committee** (R&D, Era IV Infrastructure): basic cheapest-first auto-research for the rest
+  of the run, so you never have to click through the whole tree by hand.
 - **Density**: rock gets exponentially denser with depth, so every % of the mountain costs more than the last.
 - **R&D tree**: 6 eras × 7 rows. Each *Generational Leap* unlocks the next era of equipment:
   Hands & Hope → Steam & Soot → Diesel & Quarterly Reports → Silicon & Severance → Lasers & Liability → Post-Physical Synergy.

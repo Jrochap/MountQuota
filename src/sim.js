@@ -88,7 +88,7 @@ export function defaultSettings() {
 // ── Modifiers ────────────────────────────────────────────────
 export function getMods(g) {
   const r = g.run, meta = g.meta;
-  const m = { mining: 1, extraction: 1, processing: 1, value: 1, rp: 1, buffer: 1, click: 1, global: 1, time: 1, auto: false, smartBuy: false, autoResearch: false };
+  const m = { mining: 1, extraction: 1, processing: 1, value: 1, rp: 1, buffer: 1, click: 1, global: 1, time: 1, auto: false, smartBuy: false, autoResearch: false, researchPro: false };
   for (const n of RESEARCH) if (r.research[n.id]) applyFx(m, n.fx);
   for (const s of SKILLS) { const l = meta.skills[s.id] || 0; if (l > 0 && s.apply) s.apply(m, l); }
   if (r.heir) for (const k in r.heir.trait.mods) m[k] *= r.heir.trait.mods[k];
@@ -100,6 +100,7 @@ export function getMods(g) {
 function applyFx(m, fx) {
   for (const e of fx) {
     if (e.k === 'auto') m.auto = true;
+    else if (e.k === 'research') m.autoResearch = true;
     else if (e.k !== 'era') m[e.k] *= e.x;
   }
 }
@@ -192,7 +193,7 @@ export function tick(g, dt, offline = false) {
   } else r.gary = null;
   if (m.autoResearch && g.settings?.autoResearch !== false) {
     r._resT = (r._resT || 0) + dt;
-    if (r._resT >= 1) { r._resT = 0; autoResearch(g); }
+    if (r._resT >= 1) { r._resT = 0; autoResearch(g, m.researchPro ? g.settings?.researchPriority : 'cheapest'); }
   } else r.garyJr = null;
 
   if (r.mined >= MASS && r.face <= 0 && r.yard <= 0) {
@@ -326,8 +327,9 @@ const RD_RANK = {
   commerce: n => (n.row === 3 || n.row === 4 ? 0 : n.row === 6 ? 1 : 2),
   cheapest: () => 0,
 };
-export function autoResearch(g) {
-  const r = g.run, rank = RD_RANK[g.settings?.researchPriority] || RD_RANK.leaps;
+// the Planning Committee always goes cheapest-first; Gary Jr. honours the chosen priority
+export function autoResearch(g, priority = 'cheapest') {
+  const r = g.run, rank = RD_RANK[priority] || RD_RANK.cheapest;
   for (let guard = 0; guard < 10; guard++) {
     const open = RESEARCH.filter(n => !r.research[n.id] && n.req.every(q => r.research[q]));
     if (!open.length) { r.garyJr = { text: 'Nothing left to research.' }; return; }
@@ -435,6 +437,9 @@ export function buySkill(g, id) {
   return true;
 }
 
+// every block is gone but rubble is still being hauled / processed
+export const isDraining = r => !r.complete && r.mined >= massOf(r);
+export const DRAIN_SPEED = 40;
 export const volumeFrac = r => r.mined >= massOf(r) ? 1 : Math.log(1 + r.mined / MASS_M0) / massK(r);
 export const progress = g => volumeFrac(g.run);
 export function stratum(f) { let s = STRATA[0][1]; for (const [a, n] of STRATA) if (f >= a) s = n; return s; }

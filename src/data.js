@@ -145,7 +145,7 @@ const RAW = [
   ['p3', 3, 2, 1,   "AI Sorter: 'Probably Ore'", 'Accuracy: 51%. Confidence: 100%.'],
   ['v3', 3, 3, 2,   'Rubble NFTs',               'Each pebble now has a certificate of authenticity and a Discord.'],
   ['x3', 3, 4, 2,   'Layoffs as a Service',      'Productivity soars. There is nobody left to slow it down.'],
-  ['i3', 3, 5, 1.5, 'Just-In-Time Rubble',       'Logistics so lean it is technically starving.'],
+  ['i3', 3, 5, 1.5, 'Strategic Planning Committee', 'Seven people in a room decide what to research next. They always pick the cheapest thing.'],
   ['L3', 3, 6, 10,  'Fusion (Finally)',          'Only 30 years away, for the last 80 years. Unlocks Era V.'],
   // era 4
   ['m4', 4, 0, 1,   'Ethics Waiver: Beam Focus', 'The laser is now 400% more legally ambiguous.'],
@@ -178,7 +178,7 @@ const INFRA = [
   [{ k: 'buffer', x: 3 }],
   [{ k: 'click', x: 10 }],
   [{ k: 'auto', x: 1 }],
-  [{ k: 'buffer', x: 3 }, { k: 'extraction', x: 1.5 }],
+  [{ k: 'buffer', x: 3 }, { k: 'extraction', x: 1.5 }, { k: 'research', x: 1 }],
   [{ k: 'click', x: 10 }, { k: 'buffer', x: 2 }],
   [{ k: 'mining', x: 2 }, { k: 'extraction', x: 2 }, { k: 'processing', x: 2 }],
 ];
@@ -206,6 +206,7 @@ export const FX_LABEL = {
 export function fxText(fx) {
   return fx.map(e => {
     if (e.k === 'auto') return 'Unlocks auto-buy';
+    if (e.k === 'research') return 'Unlocks auto-research';
     if (e.k === 'era') return `Unlocks Era ${ERAS[e.x].roman}`;
     if (e.k === 'time') return `Years pass ×${e.x}`;
     return `${FX_LABEL[e.k]} ×${e.x}`;
@@ -261,8 +262,8 @@ export const SKILLS = [
     apply: m => { m.auto = true; }, fxt: () => 'Auto-buy from the start' },
   { id: 'mba', name: "Gary's MBA", desc: 'Gary went back to school. He now plans purchases, chases milestones, balances the pipeline and saves up for big buys.', dir: 5, d: 3, max: 1, cost: () => 40, req: [['procure', 1]],
     apply: m => { m.smartBuy = true; }, fxt: () => 'Smart auto-buy + budget control' },
-  { id: 'garyjr', name: 'Gary Jr.', desc: "Gary's son. Nobody interviewed him. Buys research automatically, by a priority you set.", dir: 5, d: 4, max: 1, cost: () => 120, req: [['mba', 1]],
-    apply: m => { m.autoResearch = true; }, fxt: () => 'Auto-research' },
+  { id: 'garyjr', name: 'Gary Jr.', desc: "Gary's son. Nobody interviewed him. Auto-research from the first minute of every run, with a priority you set.", dir: 5, d: 3.1, da: -0.38, max: 1, cost: () => 60, req: [['procure', 1]],
+    apply: m => { m.autoResearch = true; m.researchPro = true; }, fxt: () => 'Auto-research from the start + priorities' },
   { id: 'breeding', name: 'Selective Succession', desc: 'Heirs chosen by merit. Merit defined by the board.', dir: 5, d: 2.45, da: 0.5, max: 1, cost: () => 60, req: [['procure', 1]],
     fxt: () => 'Heirs always get a good trait' },
 ];

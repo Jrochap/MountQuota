@@ -99,6 +99,7 @@ export class UI {
     <div class="memo panel" id="memo" hidden></div>
     <div class="toasts" id="toasts"></div>
     <div class="banner" id="banner" hidden></div>
+    <div class="drain" id="drain" hidden><b>▶▶ ×${S.DRAIN_SPEED}</b> LAST BLOCK MINED — FAST-FORWARDING FINAL SHIPMENTS <span class="mono" id="drain-t"></span></div>
     <div class="hint" id="hint">▲ CLICK THE MOUNTAIN — THE FOUNDER WILL PERSONALLY SWING A PICKAXE</div>
     <footer class="ticker"><div class="tk-label">QUARRY NEWS NETWORK</div><div class="tk-track"><div class="tk-inner" id="ticker"></div></div></footer>
 
@@ -183,7 +184,7 @@ export class UI {
       const n = RESEARCH_BY_ID[t.dataset.node];
       if (!S.doResearch(this.g, n.id)) { if (S.researchState(this.g, n.id) === 'available') this.sfx('denied'); return; }
       if (!n.fx.some(e => e.k === 'era')) this.sfx('research');
-      { this.toast(`RESEARCHED — ${n.name}`, fxText(n.fx)); this.update(true); }
+      { this.toast(`RESEARCHED — ${n.name}`, fxText(n.fx)); this.renderRdAuto(); this.update(true); }
       return;
     }
     if (t.dataset.skill) {
@@ -295,6 +296,10 @@ export class UI {
   renderRdAuto() {
     const el = $('#rd-auto'), m = S.getMods(this.g), s = this.g.settings;
     if (!m.autoResearch) { setHTML(el, ''); return; }
+    if (!m.researchPro) {
+      setHTML(el, `<b>PLANNING COMMITTEE</b><button class="chip ${s.autoResearch ? 'on' : ''}" data-set="autoResearch">${s.autoResearch ? 'ON' : 'OFF'}</button><span class="mono dim" title="Gary Jr. (Family Tree) adds priorities and works from the start of every run">cheapest first</span><span class="mono dim" id="rd-auto-t"></span>`);
+      return;
+    }
     const P = [['cheapest', 'BALANCED', 'Cheapest first. Fastest overall.'], ['leaps', 'RUSH LEAPS', 'Generational Leaps first. Skips cheap multipliers, so usually slower.'], ['commerce', 'COMMERCE FIRST', 'Credits & doctrine first.']];
     setHTML(el, `<b>GARY JR.</b><button class="chip ${s.autoResearch ? 'on' : ''}" data-set="autoResearch">${s.autoResearch ? 'ON' : 'OFF'}</button>
       ${P.map(([k, l, tip]) => `<button class="chip ${s.researchPriority === k ? 'on' : ''}" data-rprio="${k}" title="${tip}">${l}</button>`).join('')}<span class="mono dim" id="rd-auto-t"></span>`);
@@ -650,7 +655,10 @@ export class UI {
     }
     if (this.open === 'rd') this.updateRD();
     if (this.open === 'fam') { this.updateFam(); if (force) this.renderEvolve(); }
-    if (r.clicks >= 6) $('#hint').hidden = true;
+    const dr = S.isDraining(r), de = $('#drain');
+    if (r.clicks >= 6 || dr || r.complete) $('#hint').hidden = true;
+    if (de.hidden === dr) de.hidden = !dr;
+    if (dr) setText($('#drain-t'), `${tons(r.face + r.yard)} left · years still count`);
   }
 
   // ── reactions to sim events ──────────────────────────────
