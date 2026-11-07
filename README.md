@@ -18,6 +18,9 @@ Add `?speed=20` to the URL to fast-forward while testing.
   the stage upstream stalls, so throughput equals your weakest stage (marked **BOTTLENECK**). A pile holds at most
   60 seconds of what the *next* stage can clear, so a runaway mining department clogs (FACE CLOGGED) instead of
   "mining" the mountain decades before processing catches up.
+- **Crew Reassignment**: buffer upgrades (Ancestral Holes and the Infrastructure research) also loan idle crews
+  from the fastest stage to slower ones. Each doubling of buffer size lends 2% of the gap, never more than +2% of the
+  stage's own rate per doubling, up to +15%. The pipeline shows it as "+N% loaned crews".
 - **Processing** turns rubble into Credits (₵, used for equipment) and Research (RP, used for the R&D tree).
 - **Old equipment stays relevant**:
   - *Legacy Workforce*: every older unit gives +1% to all newer units in its department.
@@ -102,5 +105,5 @@ Current numbers: first run ≈ 100 years (~33 min of real time; trophies earned 
 The prestige curve goes 98 → 63 → 40 → 25 → 18 → 14 → 11 → 9.5. All 14 mountains land between about 98 and 118 years.
 About 38% of the output gained comes from buying older units. Gary's MBA runs about 14% faster than basic Gary.
 For a veteran, contracts trade about 25–40% more time for 40–60% more Legacy; Quarterly Deadline pays about ×2.5.
-Tectonic Assets, tackled in order by a dynasty around run 8 (lifetime ◆~380): Shelf ≈ 500 years, Olympus ≈ 445,
-Under the Mountain ≈ 370, Pangaea ≈ 800. That's about 2.5–5.5 hours of real play each.
+Tectonic Assets, tackled in order by a dynasty around run 8 (lifetime ◆~380): Shelf ≈ 440 years, Olympus ≈ 410,
+Under the Mountain ≈ 340, Pangaea ≈ 600. That's about 2.5–5 hours of real play each.

@@ -2,7 +2,7 @@
 //  MOUNT QUOTA — simulation core (pure logic, no DOM / three)
 // ─────────────────────────────────────────────────────────────
 import {
-  SEC_PER_YEAR, GEN_YEARS, MASS_K, MASS_M0, STRATA, MOUNTAINS, MOUNTAIN_BY_ID, OFFER_SIZE, BASE_VALUE, RP_PER_TON, BUFFER_SECONDS, BUFFER_MAX_SECONDS, BUFFER_MIN,
+  SEC_PER_YEAR, GEN_YEARS, MASS_K, MASS_M0, STRATA, MOUNTAINS, MOUNTAIN_BY_ID, OFFER_SIZE, BASE_VALUE, RP_PER_TON, BUFFER_SECONDS, BUFFER_MAX_SECONDS, BUFFER_MIN, SPILL_PER_DOUBLING, SPILL_MAX,
   DEFERRED_RATE, DEFERRED_CAP, OVERTIME_X, COST_GROWTH, WORKFORCE, MILESTONES, MILESTONE_X, DEPRECIATION, GARY_SAVE_SECONDS, GARY_SAVE_ADVANTAGE, GARY_BALANCE, GARY_LEAD_POWER, LEGACY_BONUS, LEGACY_PROGRESS, LEGACY_COMPLETE, PAR_YEARS,
   CATS, UNITS, RESEARCH, RESEARCH_BY_ID, SKILLS, SKILL_BY_ID, TRUST_FUND,
   FIRST_NAMES, TRAITS, FOUNDER_TRAIT, softenTrait, EVENTS, TROPHIES, TROPHY_BY_ID, CONTRACTS, CONTRACT_BY_ID, GIANTS, isGiant, RELICS, RELIC_BY_ID, STRATUM_STEP, SUCCESSION_SECONDS, HEIR_BIOS, BOARD_PICK_LINES,
@@ -167,9 +167,16 @@ export function gainOf(g, cat, e, n, m) {
   u[e] += n; const after = deptBase(cat, u); u[e] -= n;
   return (after - before) * m[cat] * m.global;
 }
-export function rates(g, m) {
+export function rawRates(g, m) {
   const out = {};
   for (const c of CAT_IDS) out[c] = deptBase(c, g.run.units[c]) * m[c] * m.global;
+  return out;
+}
+// Crew Reassignment: share of the gap to the fastest stage that slower stages borrow (from buffer upgrades)
+export const spillFrac = m => Math.max(0, Math.min(SPILL_MAX, SPILL_PER_DOUBLING * Math.log2(m.buffer)));
+export function rates(g, m) {
+  const out = rawRates(g, m), s = spillFrac(m);
+  if (s > 0) { const top = Math.max(...CAT_IDS.map(c => out[c])); for (const c of CAT_IDS) out[c] += s * Math.min(top - out[c], out[c]); }
   return out;
 }
 // A pile holds a few seconds of what the NEXT stage can clear (not of what the previous stage can dump),

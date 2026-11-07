@@ -85,6 +85,11 @@ export const RP_PER_TON = 0.1;         // research points per processed ton
 export const BUFFER_SECONDS = 20;      // buffer cap = upstream rate × this
 export const BUFFER_MIN = 60;          // minimum buffer cap (tons)
 export const BUFFER_MAX_SECONDS = 60; // …but never more than this many seconds of the next stage's throughput
+// Crew Reassignment: idle crews from faster stages are loaned to slower ones. Each doubling of buffer
+// size lends a slower stage SPILL_PER_DOUBLING of its gap to the fastest stage, but never more than
+// that same fraction of its own rate, and the fraction tops out at SPILL_MAX (+15% at ×180 buffers).
+export const SPILL_PER_DOUBLING = 0.02;
+export const SPILL_MAX = 0.15;
 export const COST_GROWTH = 1.17;
 // Legacy Workforce: every older unit still on payroll boosts all newer units in its department
 export const WORKFORCE = 0.01;
@@ -250,7 +255,7 @@ export const RESEARCH_BY_ID = Object.fromEntries(RESEARCH.map(n => [n.id, n]));
 
 export const FX_LABEL = {
   mining: 'Mining', extraction: 'Extraction', processing: 'Processing', value: 'Credits / ton',
-  rp: 'Research', global: 'All output', buffer: 'Buffer size', click: 'Click power', time: 'Years elapse',
+  rp: 'Research', global: 'All output', buffer: 'Buffers & crew loans', click: 'Click power', time: 'Years elapse',
 };
 export function fxText(fx) {
   return fx.map(e => {
@@ -279,8 +284,8 @@ export const SKILLS = [
   // Logistics (extraction) — upper right
   { id: 'barrow', name: 'Inherited Wheelbarrow', desc: 'Passed down for generations. One wheel is original.', dir: 1, d: 1, max: 5, cost: pow(5, 3), req: [['founder', 1]],
     apply: (m, l) => { m.extraction *= Math.pow(1.25, l); }, fxt: l => `Extraction ×${(1.25 ** l).toFixed(2)}` },
-  { id: 'holes', name: 'Ancestral Holes', desc: 'Grandfather always said: dig the hole bigger than the problem.', dir: 1, d: 2, max: 3, cost: pow(8, 3), req: [['barrow', 1]],
-    apply: (m, l) => { m.buffer *= Math.pow(2, l); }, fxt: l => `Buffer size ×${2 ** l}` },
+  { id: 'holes', name: 'Ancestral Holes', desc: 'Grandfather always said: dig the hole bigger than the problem. Then send whoever is standing around to fill it.', dir: 1, d: 2, max: 3, cost: pow(8, 3), req: [['barrow', 1]],
+    apply: (m, l) => { m.buffer *= Math.pow(2, l); }, fxt: l => `Buffers & crew loans ×${2 ** l}` },
   { id: 'charter', name: 'Tectonic Charter', desc: 'The family is licensed to acquire geology at continental scale. The lawyers have been fed.', dir: 1, d: 3, max: 1, cost: () => 300, req: [['holes', 2]],
     fxt: () => 'Unlocks Tectonic Assets: giant mountains at Evolve' },
 

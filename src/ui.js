@@ -673,6 +673,7 @@ export class UI {
     const flows = { mining: r.flow.mine, extraction: r.flow.haul, processing: r.flow.proc };
     const fc = S.faceCap(R, m), yc = S.yardCap(R, m);
     const minCat = ['mining', 'extraction', 'processing'].reduce((a, b) => (R[b] < R[a] ? b : a));
+    const raw = S.rawRates(g, m);                       // before Crew Reassignment loans
     for (const st of this.root.querySelectorAll('.stage')) {
       const c = st.dataset.cat;
       setHTML($('.st-rate', st), `${fmt(flows[c])}<small> / ${fmt(R[c])} t/s</small>`);
@@ -680,6 +681,8 @@ export class UI {
       if (c === 'mining') { fill = r.face / fc; note = fill > 0.97 ? 'FACE CLOGGED' : `face ${tons(r.face)}`; }
       else if (c === 'extraction') { fill = r.yard / yc; note = fill > 0.97 ? 'YARD FULL' : `yard ${tons(r.yard)}`; }
       else { note = `₵${fmt(S.valuePerTon(m))}/t · ${fmt(S.rpPerTon(m))} RP/t`; fill = R.processing > 0 ? Math.min(1, flows.processing / R.processing) : 0; }
+      const loan = raw[c] > 0 ? R[c] / raw[c] - 1 : 0;
+      if (loan > 0.005) note += ` · +${Math.round(loan * 100)}% loaned crews`;
       $('.st-buf i', st).style.width = (Math.min(1, fill) * 100) + '%';
       setText($('.st-note', st), note);
       const tag = $('.tag', st);
