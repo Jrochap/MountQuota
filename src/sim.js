@@ -2,8 +2,8 @@
 //  MOUNT QUOTA — simulation core (pure logic, no DOM / three)
 // ─────────────────────────────────────────────────────────────
 import {
-  SEC_PER_YEAR, GEN_YEARS, MASS_K, MASS_M0, STRATA, MOUNTAINS, MOUNTAIN_BY_ID, OFFER_SIZE, BASE_VALUE, RP_PER_TON, BUFFER_SECONDS, BUFFER_MIN,
-  DEFERRED_RATE, DEFERRED_CAP, OVERTIME_X, COST_GROWTH, WORKFORCE, MILESTONES, MILESTONE_X, DEPRECIATION, GARY_SAVE_SECONDS, GARY_SAVE_ADVANTAGE, GARY_BALANCE, LEGACY_BONUS, LEGACY_PROGRESS, LEGACY_COMPLETE, PAR_YEARS,
+  SEC_PER_YEAR, GEN_YEARS, MASS_K, MASS_M0, STRATA, MOUNTAINS, MOUNTAIN_BY_ID, OFFER_SIZE, BASE_VALUE, RP_PER_TON, BUFFER_SECONDS, BUFFER_MAX_SECONDS, BUFFER_MIN,
+  DEFERRED_RATE, DEFERRED_CAP, OVERTIME_X, COST_GROWTH, WORKFORCE, MILESTONES, MILESTONE_X, DEPRECIATION, GARY_SAVE_SECONDS, GARY_SAVE_ADVANTAGE, GARY_BALANCE, GARY_LEAD_POWER, LEGACY_BONUS, LEGACY_PROGRESS, LEGACY_COMPLETE, PAR_YEARS,
   CATS, UNITS, RESEARCH, RESEARCH_BY_ID, SKILLS, SKILL_BY_ID, TRUST_FUND,
   FIRST_NAMES, TRAITS, FOUNDER_TRAIT, softenTrait, EVENTS, TROPHIES, TROPHY_BY_ID, CONTRACTS, CONTRACT_BY_ID, GIANTS, isGiant, RELICS, RELIC_BY_ID, STRATUM_STEP, SUCCESSION_SECONDS, HEIR_BIOS, BOARD_PICK_LINES,
 } from './data.js';
@@ -172,8 +172,12 @@ export function rates(g, m) {
   for (const c of CAT_IDS) out[c] = deptBase(c, g.run.units[c]) * m[c] * m.global;
   return out;
 }
-export function faceCap(R, m) { return Math.max(BUFFER_MIN * m.buffer, R.mining * BUFFER_SECONDS * m.buffer); }
-export function yardCap(R, m) { return Math.max(BUFFER_MIN * m.buffer, R.extraction * BUFFER_SECONDS * m.buffer); }
+// A pile holds a few seconds of what the NEXT stage can clear (not of what the previous stage can dump),
+// capped at BUFFER_MAX_SECONDS. Otherwise a huge mining rate × buffer upgrades could hold the whole
+// mountain on the face pile: "100% mined" decades before processing catches up.
+const bufSecs = m => Math.min(BUFFER_SECONDS * m.buffer, BUFFER_MAX_SECONDS);
+export function faceCap(R, m) { return Math.max(BUFFER_MIN * m.buffer, Math.min(R.mining, R.extraction) * bufSecs(m)); }
+export function yardCap(R, m) { return Math.max(BUFFER_MIN * m.buffer, Math.min(R.extraction, R.processing) * bufSecs(m)); }
 export function valuePerTon(m) { return BASE_VALUE * m.value; }
 export function rpPerTon(m) { return RP_PER_TON * m.rp; }
 
@@ -411,11 +415,11 @@ export function smartBuy(g, m) {
     const budget = r.credits - reserve;
     let best = null, bestAff = null;
     for (const c of cats) {
-      // throughput is capped by the weakest department, so output added elsewhere is discounted in
-      // proportion to its lead (not zeroed: cheap units there still pay off via workforce & milestones).
-      // Linear beat squared/flat weightings in the balance sim.
+      // throughput is capped by the weakest department, so output added elsewhere is discounted steeply
+      // by its lead (not zeroed: cheap units there still pay off via workforce & milestones).
+      // With buffers bounded by the downstream stage, ^4 beat linear by ~5% in the balance sim.
       const lead = R[c] / Math.max(minR, 1e-9);
-      const w = lead <= GARY_BALANCE ? 1 : Math.max(1e-4, GARY_BALANCE / lead);
+      const w = lead <= GARY_BALANCE ? 1 : Math.max(1e-6, Math.pow(GARY_BALANCE / lead, GARY_LEAD_POWER));
       for (let e = minEra(r); e <= r.era; e++) {
         const own = r.units[c][e], nx = nextMilestone(own);
         const opts = [1];

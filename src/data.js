@@ -84,6 +84,7 @@ export const BASE_VALUE = 1;           // credits per processed ton
 export const RP_PER_TON = 0.1;         // research points per processed ton
 export const BUFFER_SECONDS = 20;      // buffer cap = upstream rate × this
 export const BUFFER_MIN = 60;          // minimum buffer cap (tons)
+export const BUFFER_MAX_SECONDS = 60; // …but never more than this many seconds of the next stage's throughput
 export const COST_GROWTH = 1.17;
 // Legacy Workforce: every older unit still on payroll boosts all newer units in its department
 export const WORKFORCE = 0.01;
@@ -100,6 +101,7 @@ export const MILESTONE_X = 2;
 export const GARY_SAVE_SECONDS = 10;
 export const GARY_SAVE_ADVANTAGE = 1.3;
 export const GARY_BALANCE = 1.1;         // departments within 10% of the weakest get full priority
+export const GARY_LEAD_POWER = 4;        // how steeply departments ahead of the bottleneck are discounted
 // Depreciation: obsolete equipment goes on clearance — price × this per era behind the current one
 export const DEPRECIATION = 0.02;
 export const LEGACY_BONUS = 0.005;     // +0.5% global output per lifetime Legacy

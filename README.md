@@ -15,7 +15,9 @@ Add `?speed=20` to the URL to fast-forward while testing.
 
 ## How it plays
 - **Pipeline**: Mining → Extraction → Processing. Each stage feeds a buffer. When the face pile or the yard fills up,
-  the stage upstream stalls, so throughput equals your weakest stage (marked **BOTTLENECK**).
+  the stage upstream stalls, so throughput equals your weakest stage (marked **BOTTLENECK**). A pile holds at most
+  60 seconds of what the *next* stage can clear, so a runaway mining department clogs (FACE CLOGGED) instead of
+  "mining" the mountain decades before processing catches up.
 - **Processing** turns rubble into Credits (₵, used for equipment) and Research (RP, used for the R&D tree).
 - **Old equipment stays relevant**:
   - *Legacy Workforce*: every older unit gives +1% to all newer units in its department.
@@ -25,7 +27,7 @@ Add `?speed=20` to the URL to fast-forward while testing.
 - **Gary** (auto-buy) has a career path in the Family Tree's Bureaucracy branch:
   - *Procurement Instinct*: basic Gary.
   - *Gary's MBA* (◆40): buys in bundles to reach milestones, keeps the pipeline balanced and saves up for big buys,
-    with a budget slider. About 11% faster runs than basic Gary.
+    with a budget slider. About 14% faster runs than basic Gary.
   - *Gary Jr.* (◆60, needs Procurement Instinct): auto-research from the start of every run, with Balanced,
     Rush Leaps or Commerce First priority. Balanced keeps pace with a perfect manual player.
 - **Strategic Planning Committee** (R&D, Era IV Infrastructure): basic cheapest-first auto-research for the rest
@@ -98,7 +100,7 @@ Random heir traits add noise of about ±5 years per run, so use `--trials 20` be
 
 Current numbers: first run ≈ 100 years (~33 min of real time; trophies earned along the way speed it up a little).
 The prestige curve goes 98 → 63 → 40 → 25 → 18 → 14 → 11 → 9.5. All 14 mountains land between about 98 and 118 years.
-About 38% of the output gained comes from buying older units. Gary's MBA runs about 11% faster than basic Gary.
+About 38% of the output gained comes from buying older units. Gary's MBA runs about 14% faster than basic Gary.
 For a veteran, contracts trade about 25–40% more time for 40–60% more Legacy; Quarterly Deadline pays about ×2.5.
 Tectonic Assets, tackled in order by a dynasty around run 8 (lifetime ◆~380): Shelf ≈ 500 years, Olympus ≈ 445,
-Under the Mountain ≈ 370, Pangaea ≈ 710. That's about 2.5–5.5 hours of real play each.
+Under the Mountain ≈ 370, Pangaea ≈ 800. That's about 2.5–5.5 hours of real play each.
