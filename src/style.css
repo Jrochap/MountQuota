@@ -63,7 +63,7 @@ button { font: inherit; color: inherit; }
 .clock .big { font-size: 38px; font-weight: 700; line-height: 1; letter-spacing: -.03em; }
 .heir { font-size: 11px; margin-top: 4px; }
 .trait { font-size: 10px; color: var(--mute); font-family: var(--f-mono); margin-top: 2px; max-width: 320px; }
-.menu { display: flex; flex-direction: column; gap: 8px; justify-content: center; margin-left: auto; }
+.menu { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-content: center; margin-left: auto; }
 
 /* ── mountain progress ── */
 .mtn { position: absolute; left: 14px; right: calc(var(--ops-w) + 32px); bottom: 46px; padding: 8px 12px 10px; }
@@ -358,3 +358,20 @@ body.no-ticker .memo { bottom: 100px; }
 .ot b { font-family: var(--f-sans); letter-spacing: .08em; font-size: 10px; }
 .ot:hover { background: var(--ink); color: var(--paper); }
 .ot.on { background: var(--acc); color: #fff; border-color: var(--acc); animation: pulse 1.4s infinite; }
+
+/* ── trophies & contracts ── */
+.trophies { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; margin-top: 10px; }
+.trophy { border: 2px dashed #b5afa3; padding: 9px 10px; display: grid; grid-template-columns: 22px 1fr; gap: 2px 8px; opacity: .65; }
+.trophy.got { border: 2px solid var(--ink); background: var(--ink); color: var(--paper); opacity: 1; box-shadow: 4px 4px 0 var(--acc); }
+.t-ic { grid-row: span 3; font-size: 18px; color: var(--acc); }
+.t-n { font-weight: 700; font-size: 13px; }
+.t-d { font-size: 11px; color: var(--mute); }
+.trophy.got .t-d { color: #a9a49a; }
+.t-r { font-size: 10px; color: var(--acc); font-weight: 700; }
+.contracts { display: flex; flex-direction: column; gap: 6px; }
+.ccard { text-align: left; border: 2px solid var(--ink); background: var(--paper); padding: 6px 9px; cursor: pointer; display: flex; flex-direction: column; gap: 2px; }
+.ccard:hover { background: var(--paper-2); }
+.ccard.on { border-color: var(--acc); box-shadow: 4px 4px 0 var(--acc); background: #fff1ea; }
+.ccard .mc-n i { font-style: normal; font-family: var(--f-mono); font-size: 9.5px; color: var(--acc); margin-left: 4px; }
+.mmods b.contract { background: var(--acc); border-color: var(--acc); color: #fff; }
+.node.forbidden { opacity: .3; border-style: dotted; cursor: not-allowed; }

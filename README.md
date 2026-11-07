@@ -44,6 +44,16 @@ Add `?speed=20` to the URL to fast-forward while testing.
   multiplier. On every Evolution the board offers 3 to pick from, and records are kept per mountain.
 - **Sound**: fully synthesized with Web Audio, so there are no asset files. One-shot effects, a concrete-hall reverb,
   an ambient bed per era and machinery rhythms that follow what you own. Press **M** to mute; volumes are in the Ledger.
+- **Shareholder Trophies**: 24 permanent achievements, such as records under 100/50/20/5 years, liquidating every
+  mountain, ₵1Qa in the bank, 400 peasants, 1,000 Founder clicks and winning 10 gambles. Each pays a small
+  permanent bonus.
+- **Board Contracts** (unlocked after your first liquidation): optional rule twists you sign at Evolve for the next
+  run, each worth more Legacy if you finish:
+  - *Austerity Measures*: Doctrine research costs ×500.
+  - *Union Contract*: no clearance prices.
+  - *Gary's Sabbatical*: no automation.
+  - *Expansion Mandate*: ×20 tonnage.
+  - *Quarterly Deadline*: finish within 40 years for ×2.5 Legacy, otherwise ×0.5.
 - **Time away**: no in-game years pass while you're away, so closing the tab never hurts your record. Time away is
   banked as *Deferred Time* (25% of it, up to 30 minutes) and spent as *Overtime*: all output ×2 while it lasts.
 - **Evolve the Dynasty** (prestige): reset the run for Legacy ◆. You get a progress bonus, plus a completion bonus
@@ -71,10 +81,12 @@ python3 tools/balance.py chain --runs 12  # prestige curve with greedy Legacy sp
 python3 tools/balance.py oldunits         # how much output comes from buying older units
 python3 tools/balance.py gary --trials 20 # auto-buy tiers compared
 python3 tools/balance.py heirs --trials 20 # does choosing the heir matter?
+python3 tools/balance.py contracts         # Board Contracts, fresh vs veteran
 python3 tools/balance.py all
 ```
 Random heir traits add noise of about ±5 years per run, so use `--trials 20` before trusting small differences.
 
-Current numbers: first run ≈ 115 years (~38 min of real time), with eras at years 12/23/37/58/86. The prestige curve goes
-111 → 74 → 49 → 40 → 28 → 24 → 16 → 13. All 14 mountains land between about 104 and 121 years. About 37% of the output
-gained comes from buying older units. Gary's MBA runs about 11% faster than basic Gary.
+Current numbers: first run ≈ 100 years (~33 min of real time; trophies earned along the way speed it up a little).
+The prestige curve goes 98 → 63 → 40 → 25 → 18 → 14 → 11 → 9.5. All 14 mountains land between about 98 and 118 years.
+About 38% of the output gained comes from buying older units. Gary's MBA runs about 11% faster than basic Gary.
+For a veteran, contracts trade about 25–40% more time for 40–60% more Legacy; Quarterly Deadline pays about ×2.5.

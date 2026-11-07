@@ -341,6 +341,51 @@ export const TRAITS = [
 // halve a trait's downsides (Selective Succession)
 export const softenTrait = tr => ({ ...tr, mods: Object.fromEntries(Object.entries(tr.mods).map(([k, v]) => [k, v < 1 ? 1 - (1 - v) / 2 : v])), softened: true });
 
+// ── Shareholder Trophies (permanent; each grants a small bonus) ──
+// conditions live in sim.js (TROPHY_CHECKS) so they can use game helpers
+export const TROPHIES = [
+  { id: 'first',      name: 'Groundbreaking',                desc: 'Liquidate your first mountain.',                 fx: { k: 'global', x: 1.03 } },
+  { id: 'era6',       name: 'Post-Physical',                 desc: 'Reach Era VI.',                                  fx: { k: 'rp', x: 1.05 } },
+  { id: 'century',    name: 'Sub-Centennial',                desc: 'Liquidate a mountain in under 100 years.',       fx: { k: 'global', x: 1.03 } },
+  { id: 'fifty',      name: 'Half-Century Hustle',           desc: 'Liquidate a mountain in under 50 years.',        fx: { k: 'global', x: 1.04 } },
+  { id: 'twenty',     name: 'Two-Decade Demolition',         desc: 'Liquidate a mountain in under 20 years.',        fx: { k: 'global', x: 1.05 } },
+  { id: 'five',       name: 'Five-Year Plan',                desc: 'Liquidate a mountain in under 5 years.',         fx: { k: 'time', x: 0.97 } },
+  { id: 'geologist',  name: 'Amateur Geologist',             desc: 'Liquidate 5 different mountains.',               fx: { k: 'value', x: 1.05 } },
+  { id: 'collector',  name: 'Collector of Mountains',        desc: 'Liquidate every mountain at least once.',        fx: { k: 'global', x: 1.1 } },
+  { id: 'habit',      name: 'Dynastic Habit',                desc: 'Evolve the Dynasty 10 times.',                   fx: { k: 'rp', x: 1.05 } },
+  { id: 'million',    name: 'Millionaire Family',            desc: 'Hold ₵1M at once.',                              fx: { k: 'value', x: 1.03 } },
+  { id: 'billion',    name: 'Billionaire Bloodline',         desc: 'Hold ₵1B at once.',                              fx: { k: 'value', x: 1.03 } },
+  { id: 'quad',       name: 'Generational Wealth Disorder',  desc: 'Hold ₵1Qa (10¹⁵) at once.',                      fx: { k: 'value', x: 1.05 } },
+  { id: 'mover',      name: 'Mountain Mover',                desc: 'Process 1M tons per second.',                    fx: { k: 'processing', x: 1.05 } },
+  { id: 'event',      name: 'Geological Event',              desc: 'Process 1T tons per second.',                    fx: { k: 'global', x: 1.05 } },
+  { id: 'revolt',     name: 'Peasant Revolt (Cancelled)',    desc: 'Own 400 Pickaxe Peasants.',                      fx: { k: 'mining', x: 1.05 } },
+  { id: 'fullhouse',  name: 'Full House',                    desc: 'Own 100+ of a unit in every department.',        fx: { k: 'global', x: 1.03 } },
+  { id: 'seniority',  name: 'Seniority Pay',                 desc: 'Reach Legacy Workforce ×5 on any unit.',         fx: { k: 'extraction', x: 1.05 } },
+  { id: 'hands',      name: 'Hands-On Leadership',           desc: 'Swing the Founder\'s pickaxe 1,000 times (lifetime).', fx: { k: 'click', x: 3 } },
+  { id: 'stamp',      name: 'Rubber Stamp',                  desc: 'Answer 50 board memos (lifetime).',              fx: { k: 'rp', x: 1.05 } },
+  { id: 'roller',     name: 'High Roller',                   desc: 'Win 10 board gambles (lifetime).',               fx: { k: 'value', x: 1.05 } },
+  { id: 'succession', name: 'Succession Planning',           desc: 'Personally choose 20 heirs (lifetime).',         fx: { k: 'global', x: 1.03 } },
+  { id: 'grind',      name: 'Workaholic Dynasty',            desc: 'Spend 30 minutes of Overtime (lifetime).',       fx: { k: 'global', x: 1.02 } },
+  { id: 'signed',     name: 'Under Contract',                desc: 'Complete any Board Contract.',                   fx: { k: 'global', x: 1.05 } },
+  { id: 'lawyer',     name: "Corporate Lawyer's Dream",      desc: 'Complete every Board Contract.',                 fx: { k: 'global', x: 1.1 } },
+];
+export const TROPHY_BY_ID = Object.fromEntries(TROPHIES.map(t => [t.id, t]));
+
+// ── Board Contracts (optional rule twists for the next run) ──
+export const CONTRACTS = [
+  { id: 'austerity', name: 'Austerity Measures',   legacyX: 1.6, costX: 500, rule: 'Doctrine research costs ×500.',
+    blurb: 'The board has cancelled all ideology. Thinking is now a line item.' },
+  { id: 'union',     name: 'Union Contract',       legacyX: 1.7, rule: 'No clearance prices: obsolete units cost full price.',
+    blurb: 'Every pickaxe is entitled to its original price, in perpetuity.' },
+  { id: 'sabbatical', name: "Gary's Sabbatical",   legacyX: 1.4, rule: 'No auto-buy and no auto-research.',
+    blurb: 'Gary is in Bali. Gary Jr. went with him. You will have to click things.' },
+  { id: 'mandate',   name: 'Expansion Mandate',    legacyX: 1.7, massMul: 20, rule: 'The mountain has ×20 the tonnage.',
+    blurb: 'The board bought more mountain. Nobody asked where it was stored.' },
+  { id: 'quarterly', name: 'Quarterly Deadline',   legacyX: 2.5, deadline: 40, failX: 0.5, rule: 'Finish within 40 years for ×2.5 Legacy, otherwise ×0.5.',
+    blurb: 'Shareholders want results by Q4. Of this century.' },
+];
+export const CONTRACT_BY_ID = Object.fromEntries(CONTRACTS.map(c => [c.id, c]));
+
 // ── Board memos (random events) ──────────────────────────────
 // effects: buff {k,x,dur} · credits {frac} · rp {secs} (secs of current RP income) · cash {secs}
 export const EVENTS = [

@@ -21,7 +21,7 @@ function playRun(g, { maxYears = 400, step = 0.5, manualResearch = true, onStep 
       let b;
       do {
         b = null;
-        for (const n of RESEARCH) if (researchState(g, n.id) === 'affordable' && (!b || n.cost < b.cost)) b = n;
+        for (const n of RESEARCH) if (researchState(g, n.id) === 'affordable' && (!b || rdCost(g.run, n) < rdCost(g.run, b))) b = n;
         if (b) doResearch(g, b.id);
       } while (b);
     }
@@ -101,7 +101,7 @@ const SCENARIOS = {
       while (!g.run.complete && g.run.years < 400) {
         tick(g, 1, true);
         let b;
-        do { b = null; for (const n of RESEARCH) if (researchState(g, n.id) === 'affordable' && (!b || n.cost < b.cost)) b = n; if (b) doResearch(g, b.id); } while (b);
+        do { b = null; for (const n of RESEARCH) if (researchState(g, n.id) === 'affordable' && (!b || rdCost(g.run, n) < rdCost(g.run, b))) b = n; if (b) doResearch(g, b.id); } while (b);
         const m = getMods(g);
         for (let guard = 0; guard < 60; guard++) {
           const R = rates(g, m);
@@ -158,7 +158,7 @@ const SCENARIOS = {
             chooseHeir(g, i);
           }
           let b;
-          do { b = null; for (const n of RESEARCH) if (researchState(g, n.id) === 'affordable' && (!b || n.cost < b.cost)) b = n; if (b) doResearch(g, b.id); } while (b);
+          do { b = null; for (const n of RESEARCH) if (researchState(g, n.id) === 'affordable' && (!b || rdCost(g.run, n) < rdCost(g.run, b))) b = n; if (b) doResearch(g, b.id); } while (b);
           const m = getMods(g); if (!m.auto) autoBuy(g, m, rates(g, m));
           g.out.length = 0;
         }
@@ -171,6 +171,26 @@ const SCENARIOS = {
     out(`  smart pick of 3 (bottleneck)  : ${trial({}, true)}`);
     out(`  Selective Succession, random  : ${trial({ breeding: 1 }, false)}`);
     out(`  Selective Succession, smart of 4: ${trial({ breeding: 1 }, true)}`);
+  },
+
+  // Board Contracts: how long does each take, and what Legacy does it pay vs no contract?
+  contracts() {
+    // a mid-game dynasty (roughly the skills held around run 8 of the prestige chain)
+    const VETERAN = { trust: 2, genes: 3, barrow: 3, furnace: 3, notes: 3, whisper: 2, monopoly: 2, holes: 2, vertical: 1, calendar: 1, procure: 1, skip1: 1 };
+    for (const [label, skills, lt] of [['fresh dynasty', { procure: 1 }, 0], ['veteran dynasty (~run 8)', VETERAN, 300]]) {
+      out(`BOARD CONTRACTS · ${label} · ${ARGS.trials} trials each (Mt. Obstinate)`);
+      for (const c of [{ id: null, name: 'No contract' }, ...CONTRACTS]) {
+        const ys = [], ls = [];
+        let done = 0;
+        for (let k = 0; k < ARGS.trials; k++) {
+          const g = newGame(); Object.assign(g.meta.skills, skills); g.meta.legacyTotal = lt;
+          g.run = newRun(g.meta, 'obstinate', c.id);
+          playRun(g, { maxYears: 600 });
+          ys.push(g.run.years); ls.push(legacyGain(g)); if (g.run.complete) done++;
+        }
+        out(`  ${c.name.padEnd(20)} ${fmtY(ys).padEnd(16)} legacy ≈ ${String(Math.round(mean(ls))).padEnd(5)} finished ${done}/${ARGS.trials}`);
+      }
+    }
   },
 
   // Auto-buy tiers compared on identical setups.

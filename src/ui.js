@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────────────────────
 import {
   GAME_TITLE, COMPANY, MOUNTAINS, MOUNTAIN_BY_ID, FX_LABEL, ERAS, CATS, UNITS, RESEARCH, RESEARCH_BY_ID, RD_ROWS, SKILLS, SKILL_BY_ID,
-  EVENTS, NEWS, fxText, LEGACY_BONUS, PAR_YEARS,
+  EVENTS, NEWS, fxText, LEGACY_BONUS, PAR_YEARS, TROPHIES, TROPHY_BY_ID, CONTRACTS, CONTRACT_BY_ID,
 } from './data.js';
 import * as S from './sim.js';
 import { fmt, tons, cr, rp, pct, clock, yrs } from './format.js';
@@ -53,6 +53,7 @@ export class UI {
       <nav class="menu">
         <button class="btn" data-open="rd">R&amp;D TREE <em id="rd-badge"></em></button>
         <button class="btn" data-open="fam">FAMILY TREE <em id="fam-badge"></em></button>
+        <button class="btn" data-open="trophies">TROPHIES <em id="tr-badge"></em></button>
         <button class="btn" data-open="ledger">LEDGER</button>
       </nav>
     </header>
@@ -135,6 +136,13 @@ export class UI {
       </div>
     </div>
 
+    <div class="overlay" id="ov-trophies" hidden>
+      <div class="ov-panel panel">
+        <div class="ov-head"><h2>SHAREHOLDER TROPHIES</h2><div class="ov-stat mono" id="tr-stat"></div><button class="x btn" data-close>✕</button></div>
+        <div class="ov-body pad" id="trophies"></div>
+      </div>
+    </div>
+
     <div class="overlay" id="ov-ledger" hidden>
       <div class="ov-panel panel narrow">
         <div class="ov-head"><h2>LEDGER</h2><button class="x btn" data-close>✕</button></div>
@@ -202,6 +210,7 @@ export class UI {
       if (out) this.toast('BOARD DECISION', out);
       return;
     }
+    if (t.dataset.contract != null) { S.pickContract(this.g, t.dataset.contract); this.sfx('select'); return this.renderEvolve(); }
     if (t.dataset.mtn) { S.pickMountain(this.g, t.dataset.mtn); this.sfx('select'); return this.renderEvolve(); }
     if (t.dataset.evolve != null) return this.evolveClick(t);
     if (t.dataset.act) return this.actions[t.dataset.act]?.(t);
@@ -297,6 +306,19 @@ export class UI {
     b.scrollTop = this.famRoot.y * z - b.clientHeight / 2;
   }
 
+  renderTrophies() {
+    const got = this.g.meta.trophies || {}, n = Object.keys(got).length;
+    // combined permanent bonus by stat
+    const tot = {};
+    for (const id in got) { const f = TROPHY_BY_ID[id]?.fx; if (f) tot[f.k] = (tot[f.k] || 1) * f.x; }
+    setHTML($('#tr-stat'), `${n}/${TROPHIES.length} <span class="dim">· ${Object.entries(tot).map(([k, v]) => `${FX_LABEL[k]} ×${v.toFixed(2)}`).join(' · ') || 'no bonuses yet'}</span>`);
+    const st = this.g.meta.stats || {};
+    setHTML($('#trophies'), `<p class="dim small">Permanent achievements across every run. Each one pays a small bonus forever. Lifetime: ${fmt(st.clicks || 0)} clicks · ${fmt(st.memos || 0)} memos answered · ${fmt(st.gambleWins || 0)} gambles won · ${fmt(st.heirs || 0)} heirs chosen · ${Math.floor((st.overtime || 0) / 60)} min of Overtime.</p>
+      <div class="trophies">${TROPHIES.map(t => `<div class="trophy ${got[t.id] ? 'got' : ''}">
+        <span class="t-ic">${got[t.id] ? '★' : '☆'}</span><span class="t-n">${esc(t.name)}</span>
+        <span class="t-d">${esc(t.desc)}</span><span class="t-r mono">${esc(fxText([t.fx]))}</span></div>`).join('')}</div>`);
+  }
+
   renderSuccession() {
     const r = this.run, s = r.succession, el = $('#succ');
     if (!s) { el.hidden = true; return; }
@@ -341,12 +363,13 @@ export class UI {
     $(`#ov-${id}`).hidden = false;
     this.sfx('open');
     if (id === 'ledger') this.renderLedger();
+    if (id === 'trophies') { this.seenTrophies = Object.keys(this.g.meta.trophies || {}).length; this.renderTrophies(); }
     if (id === 'rd') this.renderRdAuto();
     if (id === 'fam') { this.renderEvolve(); this.centreFam(); }
     this.update(true);
   }
   close() {
-    for (const id of ['rd', 'fam', 'ledger']) $(`#ov-${id}`).hidden = true;
+    for (const id of ['rd', 'fam', 'ledger', 'trophies']) $(`#ov-${id}`).hidden = true;
     this.open = null;
   }
 
@@ -390,7 +413,9 @@ export class UI {
     setHTML($('#rd-rp'), `${rp(this.run.rp)} <span class="dim">+${fmt(this.run.flow.rp)}/s</span>`);
     for (const el of this.rdNodes) {
       const st = S.researchState(this.g, el.dataset.node);
-      setClass(el, el.className.replace(/\b(done|locked|available|affordable)\b/g, '').trim() + ' ' + st);
+      setClass(el, el.className.replace(/\b(done|locked|available|affordable|forbidden)\b/g, '').trim() + ' ' + st);
+      const n = RESEARCH_BY_ID[el.dataset.node];
+      setText(el.lastElementChild, st === 'forbidden' ? 'FORBIDDEN BY CONTRACT' : rp(S.rdCost(this.run, n)));
     }
     for (const c of this.rdCols) c.classList.toggle('locked', +c.dataset.col > this.run.era);
     for (const l of this.rdLinks) {
@@ -482,6 +507,13 @@ export class UI {
           <span class="mc-m">${modsText(d)}</span>
           <span class="mc-r mono">LEGACY ×${d.legacyX} · ${rec != null ? 'RECORD ' + yrs(rec) : 'UNMINED'}</span></button>`;
       }).join('')}</div>
+      ${S.contractsUnlocked(g.meta) ? `<h4>BOARD CONTRACT (OPTIONAL)</h4>
+      <div class="contracts">
+        <button class="ccard ${!g.meta.contractPick ? 'on' : ''}" data-contract=""><span class="mc-n">No contract</span><span class="mc-b">Business as usual.</span></button>
+        ${CONTRACTS.map(c => `<button class="ccard ${g.meta.contractPick === c.id ? 'on' : ''}" data-contract="${c.id}">
+          <span class="mc-n">${esc(c.name)} <i>LEGACY ×${c.legacyX}</i></span><span class="mc-r">${esc(c.rule)}</span><span class="mc-b">${esc(c.blurb)}</span>
+          <span class="mc-r mono">${g.meta.contracts[c.id] != null ? 'COMPLETED · BEST ' + yrs(g.meta.contracts[c.id]) : 'NOT YET COMPLETED'}</span></button>`).join('')}
+      </div>` : '<p class="dim small">Board Contracts unlock after your first liquidation.</p>'}
       <p class="dim small">Legacy = progress bonus (${pct(f, 0)} liquidated)${r.complete ? ' + completion bonus (faster = more)' : '. Finish the mountain for a large completion bonus; the faster, the bigger.'}</p>
       <button class="btn big ${gain > 0 ? '' : 'disabled'}" data-evolve>${this.armed ? 'CONFIRM — RESET THIS RUN' : 'EVOLVE ▶'}</button>
       <p class="dim small">You keep: Legacy, Family Tree, records. You lose: everything else, emotionally included.</p>`;
@@ -514,6 +546,7 @@ export class UI {
         <dt>Founder clicks</dt><dd>${fmt(r.clicks)} (${tons(r.clickTons)})</dd>
         ${r.eraYears.map((y, i) => y != null ? `<dt>Era ${ERAS[i].roman} reached</dt><dd>year ${y.toFixed(1)}</dd>` : '').join('')}
       </dl>
+      ${r.contract ? `<h3>ACTIVE CONTRACT</h3><p class="small"><b>${esc(CONTRACT_BY_ID[r.contract].name)}</b> — ${esc(CONTRACT_BY_ID[r.contract].rule)} Pays Legacy ×${CONTRACT_BY_ID[r.contract].legacyX} if you finish${CONTRACT_BY_ID[r.contract].deadline ? ' in time' : ''}.</p>` : ''}
       <h3>DYNASTY RECORDS</h3>
       <dl class="grid">
         <dt>Best liquidation (any)</dt><dd>${yrs(m.bestYears)}</dd>
@@ -591,7 +624,11 @@ export class UI {
     setText($('#density'), '×' + fmt(S.density(r, f)));
     const def = S.mtnDef(r);
     setText($('#mname'), def.name.toUpperCase());
-    setHTML($('#mmods'), modsText(def));
+    const ctr = CONTRACT_BY_ID[r.contract];
+    setHTML($('#mmods'), modsText(def) + (ctr ? ` <b class="contract" title="${esc(ctr.rule)}">CONTRACT: ${esc(ctr.name.toUpperCase())}</b>` : ''));
+    const trN = Object.keys(meta.trophies || {}).length, unseen = trN - (this.seenTrophies ?? trN);
+    setText($('#tr-badge'), unseen > 0 ? unseen : '');
+    if (this.seenTrophies == null) this.seenTrophies = trN;
     setText($('#era-name'), `${ERAS[r.era].roman} · ${ERAS[r.era].name.toUpperCase()}`);
 
     setText($('#credits'), cr(r.credits));
@@ -723,6 +760,11 @@ export class UI {
         <div class="memo-o">${e.opts.map((o, i) => `<button class="btn" data-memo="${i}">${esc(o.label)}</button>`).join('')}</div>`;
       el.hidden = false;
       this.sfx('memo');
+    } else if (ev.type === 'trophy') {
+      const t = TROPHY_BY_ID[ev.id];
+      this.sfx('skill');
+      this.toast(`★ TROPHY — ${t.name}`, `${t.desc} Permanent bonus: ${fxText([t.fx])}.`);
+      if (this.open === 'trophies') this.renderTrophies();
     } else if (ev.type === 'overtimeEnd') {
       this.toast('OVERTIME OVER', 'The Deferred Time bank is empty. The workers collapse into a well-earned 4-minute break.');
     } else if (ev.type === 'milestone') {
@@ -742,6 +784,7 @@ export class UI {
       <h2>${esc(S.mtnDef(r).name.toUpperCase())} IS GONE.</h2>
       <p>After <b>${r.finishYears.toFixed(1)} years</b> and <b>${r.gen + 1} generations</b>, the mountain has been fully converted into gravel, money, and a strongly worded documentary.</p>
       ${record ? '<p class="acc"><b>NEW RECORD FOR THIS MOUNTAIN.</b> The family portrait has been updated.</p>' : `<p class="dim">Dynasty record here: ${yrs(best)}.</p>`}
+      ${r.contract ? `<p class="${S.contractPassed(r) ? 'acc' : 'dim'}"><b>CONTRACT ${S.contractPassed(r) ? 'FULFILLED' : 'FAILED'}:</b> ${esc(CONTRACT_BY_ID[r.contract].name)} · Legacy ×${S.contractX(r)}</p>` : ''}
       <div class="gain">+◆${fmt(gain)} <span>LEGACY ON EVOLVE</span></div>
       <div class="memo-o">
         <button class="btn big" data-act="toEvolve">CHOOSE NEXT MOUNTAIN ▶</button>

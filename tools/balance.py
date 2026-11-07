@@ -12,13 +12,14 @@ JavaScriptCore via `osascript -l JavaScript`. Uses Node instead if available
   python3 tools/balance.py oldunits        # do old units still matter?
   python3 tools/balance.py gary --trials 20
   python3 tools/balance.py heirs --trials 15
+  python3 tools/balance.py contracts
   python3 tools/balance.py all
 """
 import argparse, json, os, re, shutil, subprocess, sys, tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, 'src')
-SCENARIOS = ['fresh', 'mountains', 'chain', 'oldunits', 'gary', 'heirs', 'all']
+SCENARIOS = ['fresh', 'mountains', 'chain', 'oldunits', 'gary', 'heirs', 'contracts', 'all']
 
 
 def strip_module(code):
