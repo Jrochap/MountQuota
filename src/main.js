@@ -55,6 +55,7 @@ const site = new Site(document.getElementById('scene'), {
   },
 });
 site.setSettings(g.settings);
+window.site = site;
 
 const ui = new UI(document.getElementById('ui'), g, {
   evolve: () => { const gain = S.evolve(g); save(); return gain; },

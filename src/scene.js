@@ -8,7 +8,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { progress, getMods, rates, faceCap, yardCap, mtnDef } from './sim.js';
-import { MOUNTAINS } from './data.js';
+import { MOUNTAINS, isGiant } from './data.js';
 
 const C = {
   bg: 0xd9d4c8, ground: 0xd2ccbf, slab: 0xc4bdb0, slabSide: 0x8f897d, ink: 0x161616, accent: 0xff4f12,
@@ -223,6 +223,44 @@ const SHAPES = {
     }
     return { h };
   },
+  // ── Tectonic Assets ──
+  shelf: (u, v, H, n1, n2, x, z) => {
+    // a continent-sized stepped plateau with a ragged coastline
+    const d = Math.hypot(u * 0.78, v * 1.08) + (n1(x * 0.06, z * 0.06) - 0.5) * 0.3;
+    if (d >= 0.98) return { h: 0 };
+    const t = Math.min(1, (0.98 - d) / 0.55);
+    const step = Math.floor(t * 6) / 6;
+    return { h: H * (0.12 + 0.36 * step) + (n2(x * 0.3, z * 0.3) - 0.5) * 1.8 };
+  },
+  shield: (u, v, H, n1, n2, x, z) => {
+    // a vast, gentle shield volcano with a stepped caldera
+    const d = Math.hypot(u, v) + (n1(x * 0.1, z * 0.1) - 0.5) * 0.06;
+    if (d >= 1) return { h: 0 };
+    const h = H * 0.62 * Math.pow(1 - Math.pow(d, 1.7), 0.75);
+    if (d < 0.22) return { h: h - H * (d < 0.12 ? 0.16 : 0.08) };
+    return { h: h + (n2(x * 0.35, z * 0.35) - 0.5) * 2 * (1 - d) };
+  },
+  hollow: (u, v, H, n1, n2, x, z) => {
+    // a thick outer shell with a second, denser mountain inside it
+    const d = Math.hypot(u, v);
+    const h = H * 0.92 * Math.pow(pos0(1 - d), 1.05) + (n1(x * 0.16, z * 0.16) - 0.5) * 6 * pos0(1 - d);
+    const inner = H * 0.72 * Math.pow(pos0(1 - d / 0.58), 1.25) + (n2(x * 0.4, z * 0.4) - 0.5) * 1.5 * pos0(1 - d / 0.58);
+    if (inner <= 0.5) return { h };
+    return { h, inner, lo: Math.max(inner + 2.5, h - 4) };
+  },
+  pangaea: (u, v, H, n1, n2, x, z) => {
+    // every landform at once: a spine, peaks, plateaus and a stray volcano
+    const a = -0.6, uu = u * Math.cos(a) + v * Math.sin(a), vv = -u * Math.sin(a) + v * Math.cos(a);
+    const base = Math.hypot(u * 0.82, v * 0.95) + (n1(x * 0.05, z * 0.05) - 0.5) * 0.35;
+    if (base >= 1) return { h: 0 };
+    const land = H * 0.16 * Math.pow(1 - base, 0.5);
+    const spine = H * 0.95 * Math.pow(pos0(1 - Math.hypot(uu / 0.95, vv / 0.2)), 1.1);
+    const peaks = [[-0.45, 0.4, 0.3, 0.85], [0.5, -0.35, 0.26, 0.7], [0.2, 0.55, 0.22, 0.6]]
+      .reduce((m, [cu, cv, r, k]) => Math.max(m, H * k * Math.pow(pos0(1 - Math.hypot(u - cu, v - cv) / r), 1.3)), 0);
+    const mesa = Math.hypot(u + 0.5, v + 0.45) < 0.26 ? H * 0.36 : 0;
+    const jag = (n2(x * 0.3, z * 0.3) - 0.5) * 5;
+    return { h: Math.max(land, spine + jag * 0.6, peaks + jag * 0.4, mesa) };
+  },
   dome: (u, v, H, n1, n2, x, z) => {
     const d = Math.hypot(u * 0.95, v * 1.05);
     return { h: d < 1 ? H * 0.6 * Math.sqrt(1 - d * d) + (n1(x * 0.15, z * 0.15) - 0.5) * 2.5 : 0 };
@@ -242,6 +280,10 @@ const PALETTES = {
   ice:       { strata: [0xd8e4ea, 0xcad9e2, 0xe6eef2, 0xbfd0da], cap: 0xffffff, ore: 0x6aa7c4, oreRate: 0.03 },
   coal:      { strata: [0x2f2f30, 0x3a3a3b, 0x262627, 0x444446], cap: null, ore: C.accent, oreRate: 0.03 },
   amethyst:  { strata: [0x6d5a7a, 0x7c6889, 0x5f4e6b, 0x8a779a], cap: null, ore: 0xd9c6ef, oreRate: 0.09 },
+  shelf:     { strata: [0x9c9078, 0xaa9e84, 0x8e836c, 0xb8ad93, 0x7f8a6c], cap: null, ore: C.accent, oreRate: 0.012, tiers: true },
+  mars:      { strata: [0xa4553a, 0xb46446, 0x934a31, 0xc07552, 0x8a4430], cap: null, ore: 0xe8d6c4, oreRate: 0.02 },
+  hollow:    { strata: [0x5d5a57, 0x686461, 0x52504d, 0x726e6a], cap: C.white, ore: C.accent, oreRate: 0.015, inner: [0xd9b45a, 0xe6c46c, 0xc9a24a, 0xf0d27e] },
+  pangaea:   { strata: [0x8b877f, 0xb5714d, 0x6f747a, 0x7d8a6a, 0x9a5a3c, 0xd6c9a8], cap: C.white, ore: C.accent, oreRate: 0.03 },
   marble:    { strata: [0xeeeae3, 0xe2ddd4, 0xf6f3ee, 0xd8d2c8], cap: null, ore: 0x55524e, oreRate: 0.06 },
 };
 
@@ -407,6 +449,31 @@ export class Site {
     s.add(this.beacon);
   }
 
+  // zoom the camera, fog and shadows out for a giant mountain (and back in for a normal one)
+  frame(scale, cx, cz, radius, height) {
+    const giant = scale > 1;
+    const target = giant ? new THREE.Vector3(cx * 0.55 + 18 * 0.45, height * 0.2, cz * 0.55 + 4 * 0.45) : new THREE.Vector3(5, 5, -3);
+    const key = giant ? `${scale}:${cx}` : 'normal';
+    if (this.frameKey === key) return;
+    const first = this.frameKey == null;
+    this.frameKey = key;
+    this.viewSize = 88 * (giant ? scale * 1.05 : 1);
+    const dir = this.camera.position.clone().sub(this.controls.target).normalize();
+    this.target.copy(target); this.controls.target.copy(target);
+    this.camera.position.copy(target).addScaledVector(dir, 117.5 * (giant ? scale : 1));
+    this.camera.far = 600 * (giant ? scale * 1.4 : 1);
+    this.scene.fog.near = 140 * (giant ? scale : 1); this.scene.fog.far = 260 * (giant ? scale * 1.25 : 1);
+    const sc = this.sun.shadow.camera, ext = giant ? Math.max(75, radius + 40) : 75;
+    Object.assign(sc, { left: -ext, right: ext, top: ext, bottom: -ext, far: 220 * (giant ? scale : 1) });
+    this.sun.position.set(target.x - 30, 70 * (giant ? scale * 0.8 : 1), target.z + 42);
+    this.sun.target.position.set(target.x + 5, 0, target.z + 1);
+    this.sun.shadow.mapSize.set(giant ? 4096 : 2048, giant ? 4096 : 2048);
+    if (this.sun.shadow.map) { this.sun.shadow.map.dispose(); this.sun.shadow.map = null; }
+    sc.updateProjectionMatrix();
+    this.camera.zoom = 1;
+    if (!first) this.resize();
+  }
+
   // ── the mountain ─────────────────────────────────────────
   buildMountain(def = MOUNTAINS[0], seed = 7) {
     if (this.mountain) {
@@ -414,45 +481,68 @@ export class Site {
       this.mountain.geometry.dispose(); this.mountain.material.dispose();
       for (const list of this.miners || []) for (const a of list) a.k = -1;
     }
+    if (this.giantBase) { this.scene.remove(this.giantBase); this.giantBase.geometry.dispose(); this.giantBase.material.dispose(); this.giantBase = null; }
     this.mtnKey = def.id + ':' + seed;
     this.mtnDef = def;
-    const N = 54, R = 22, H = 34;
-    const cx = -12, cz = -6;
+    // Tectonic Assets are drawn `scale`× bigger with voxels of size `vs`: (scale/vs)³ × the voxel count,
+    // set back behind the diorama, with the camera zoomed out to fit
+    const giant = isGiant(def), scale = giant ? def.scale : 1, vs = giant ? def.vox : 1, k = scale / vs;
+    const N = Math.round(54 * k), R = 22 * k, H = 34 * k;
+    const off = 22 * (scale - 1);
+    const cx = -12 - off * 1.05, cz = -6 - off * 0.95;
+    this.voxS = vs;
     const n1 = valueNoise(seed), n2 = valueNoise(seed + 12), r = rng(seed + 35);
     const shape = SHAPES[def.shape] || SHAPES.peak;
     const pal = PALETTES[def.palette] || PALETTES.granite;
     const vox = [];
     this.lava = [];
+    const layered = !!def.phase2;     // the whole outer mountain goes before the inner one
     for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
       const x = i - N / 2 + 0.5, z = j - N / 2 + 0.5;
-      const { h, lava, lo = 0 } = shape(x / R, z / R, H, (a, b) => n1(a, b), (a, b) => n2(a, b), x, z);
-      const top = Math.max(0, Math.floor(h));
-      for (let y = Math.max(0, Math.floor(lo)); y < top; y++) vox.push({ x: x + cx, y, z: z + cz, top, lava: lava && y === top - 1, key: y + 0.06 * x + r() * 2.6 });
+      // shapes work in the classic mountain's units; heights are scaled up to the finer grid
+      const res = shape(x / R, z / R, 34, (a, b) => n1(a, b), (a, b) => n2(a, b), x / k, z / k);
+      const top = Math.max(0, Math.floor(res.h * k)), lo = (res.lo || 0) * k, inner = Math.floor((res.inner || 0) * k);
+      const wx = x * vs + cx, wz = z * vs + cz;
+      // inner mountain (hollow shape): kept until the shell is gone
+      for (let y = 0; y < inner; y++) vox.push({ x: wx, y: y * vs, cy: y, z: wz, top: inner, inner: true, key: y + 0.06 * x + r() * 2.6 });
+      for (let y = Math.max(inner, Math.floor(lo)); y < top; y++)
+        vox.push({ x: wx, y: y * vs, cy: y, z: wz, top, lava: res.lava && y === top - 1, key: y + 0.06 * x + r() * 2.6 + (layered ? 1e4 : 0) });
     }
     // removal order: highest key first (top-down, quarry face toward the yard)
     vox.sort((a, b) => b.key - a.key);
     this.total = vox.length;
     this.vox = vox;
+    this.shellN = def.phase2 ? vox.filter(v => !v.inner).length : 0;
+    this.giant = giant;
+    this.frame(giant ? def.scale : 1, cx, cz, R * vs, H * vs);
+    if (giant) {
+      // a raised bedrock slab so the giant doesn't float off the edge of the plinth
+      const w = (N + 4) * vs;
+      this.giantBase = box(w, 6, w, std(C.slabSide), cx, -3.05, cz, this.scene);
+      this.giantBase.castShadow = false;
+    }
     this.mountainCenter = new THREE.Vector3(cx, 0, cz);
     const peak = vox.reduce((a, v) => (v.y > a.y ? v : a), vox[0]);
-    this.summit = new THREE.Vector3(def.shape === 'volcano' ? cx : peak.x, peak.y + 1, def.shape === 'volcano' ? cz : peak.z);
+    this.summit = new THREE.Vector3(def.shape === 'volcano' ? cx : peak.x, peak.y + vs, def.shape === 'volcano' ? cz : peak.z);
 
-    const geo = new THREE.BoxGeometry(0.97, 0.97, 0.97);
+    const geo = new THREE.BoxGeometry(0.97 * vs, 0.97 * vs, 0.97 * vs);
     const mesh = this.mountain = new THREE.InstancedMesh(geo, std(0xffffff), vox.length);
     mesh.castShadow = true; mesh.receiveShadow = true; mesh.frustumCulled = false;
     const cr = rng(seed - 4);
     vox.forEach((v, i) => {
       let col;
+      const y = v.cy;
       if (v.lava) col = C.accent;
-      else if (pal.cap && (v.y > H * 0.74 || (v.y === v.top - 1 && v.y > H * 0.6))) col = pal.cap;
+      else if (v.inner && pal.inner) col = cr() < 0.06 ? C.accent : pal.inner[Math.floor(y / (3 * k)) % pal.inner.length];
+      else if (pal.cap && (y > H * 0.74 || (y === v.top - 1 && y > H * 0.6))) col = pal.cap;
       else if (cr() < pal.oreRate) col = pal.ore;
-      else if (pal.tiers) col = pal.strata[Math.floor(v.top > 0 ? v.y / (H * 0.11) : 0) % pal.strata.length];
-      else col = pal.strata[Math.floor((v.y + Math.sin(v.x * 0.3) * 1.2) / 3) % pal.strata.length];
+      else if (pal.tiers) col = pal.strata[Math.floor(v.top > 0 ? y / (H * 0.11) : 0) % pal.strata.length];
+      else col = pal.strata[(Math.floor((y + Math.sin(v.x * 0.3 / vs) * 1.2 * k) / (3 * k)) % pal.strata.length + pal.strata.length) % pal.strata.length];
       _c.set(col);
       const j = 0.94 + cr() * 0.1; _c.multiplyScalar(j);
       v.color = _c.getHex();
       mesh.setColorAt(i, _c);
-      setInst(mesh, i, v.x, v.y + 0.5, v.z);
+      setInst(mesh, i, v.x, v.y + 0.5 * vs, v.z);
     });
     mesh.instanceColor.needsUpdate = true;
     this.scene.add(mesh);
@@ -463,7 +553,7 @@ export class Site {
     if (count === this.removed) return;
     const m = this.mountain;
     if (count < this.removed) {
-      for (let i = count; i < this.removed; i++) { const v = this.vox[i]; setInst(m, i, v.x, v.y + 0.5, v.z); }
+      for (let i = count; i < this.removed; i++) { const v = this.vox[i]; setInst(m, i, v.x, v.y + 0.5 * this.voxS, v.z); }
     } else {
       let spawned = 0;
       for (let i = this.removed; i < count; i++) {
@@ -471,7 +561,7 @@ export class Site {
         setInst(m, i, v.x, -500, v.z, 0.001, 0.001, 0.001);
         if (fx && spawned < 14) {
           spawned++;
-          this.debris.spawn(v.x, v.y + 0.5, v.z, (Math.random() - 0.3) * 6, 4 + Math.random() * 5, (Math.random() - 0.3) * 6, 1.4 + Math.random(), 1, v.color);
+          this.debris.spawn(v.x, v.y + 0.5 * this.voxS, v.z, (Math.random() - 0.3) * 6, 4 + Math.random() * 5, (Math.random() - 0.3) * 6, 1.4 + Math.random(), 1, v.color);
         }
       }
     }
@@ -481,7 +571,7 @@ export class Site {
   front(offset = 0) {
     const k = Math.min(this.total - 1, this.removed + offset);
     const v = this.vox[k];
-    return _p.set(v.x, v.y + 1, v.z);
+    return _p.set(v.x, v.y + this.voxS, v.z);
   }
   burst(p, n) {
     for (let i = 0; i < n; i++)
@@ -664,7 +754,10 @@ export class Site {
     const def = mtnDef(run);
     if (this.mtnKey !== def.id + ':' + run.mtn.seed) this.buildMountain(def, run.mtn.seed);
     const frac = run.complete ? 1 : progress(g);
-    const want = Math.floor(frac * this.total);
+    const p2 = def.phase2;
+    const want = p2 && this.shellN
+      ? Math.floor(frac < p2.at ? frac / p2.at * this.shellN : this.shellN + (frac - p2.at) / (1 - p2.at) * (this.total - this.shellN))
+      : Math.floor(frac * this.total);
     const before = this.removed;
     this.setRemoved(want, Math.abs(want - this.removed) < 400);
     this.lastRemoved = Math.max(0, this.removed - before);
@@ -688,7 +781,7 @@ export class Site {
         const a = list[i];
         if (a.k < this.removed || a.k >= this.total) { a.k = this.removed + Math.floor(Math.random() * win); a.ry = Math.random() * 6; }
         const v = this.vox[Math.min(this.total - 1, a.k)];
-        const x = v.x + a.ox * 0.6, z = v.z + a.oz * 0.6, y = v.y + 1;
+        const x = v.x + a.ox * 0.6, z = v.z + a.oz * 0.6, y = v.y + this.voxS;
         if (e === 0) {
           const bob = Math.abs(Math.sin(t * 6 + a.ph)) * 0.12;
           setInst(meshes[0], i, x, y + bob, z, 1, 1, 1, a.ry, Math.sin(t * 6 + a.ph) * 0.25);

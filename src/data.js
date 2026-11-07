@@ -45,7 +45,35 @@ MOUNTAINS.push(
   { id: 'spikes', name: 'Spikes of Synergy', shape: 'crystal', palette: 'amethyst', massX: 1.08, legacyX: 1.25, mods: { value: 1.6, extraction: 0.8 },
     blurb: 'Every rock is pointy. Every rock is premium. Every rock is a lawsuit.' },
 );
-export const MOUNTAIN_BY_ID = Object.fromEntries(MOUNTAINS.map(m => [m.id, m]));
+// ── Tectonic Assets: giant mountains for a well-upgraded dynasty ──
+// Unlocked by the Tectonic Charter skill; always available at Evolve (not part of the random survey).
+// massMul multiplies the tonnage · rating: recommended lifetime Legacy · par: years for a full completion bonus
+// scale/vox: drawn scale.ratio of the scene and voxel size (more voxels, zoomed-out camera)
+// startEra/minEra: begin in that era; older equipment doesn't work · phase2: mods replace `mods` past `at`
+// relic: permanent reward for the first liquidation · contracts are not allowed on giants
+export const GIANTS = [
+  { id: 'shelf', name: 'The Continental Shelf', shape: 'shelf', palette: 'shelf', massX: 1, massMul: 1e4, legacyX: 10, par: 500, rating: 350,
+    scale: 2.3, vox: 1.5, mods: { mining: 1.3, extraction: 0.6 },
+    blurb: 'Technically a continent. The board has filed it under "big rock". Hauling it is everyone\'s problem.',
+    relic: { id: 'weekends', name: 'Gary Works Weekends', desc: 'Mining, extraction and processing ×1.25, forever.', fx: [{ k: 'mining', x: 1.25 }, { k: 'extraction', x: 1.25 }, { k: 'processing', x: 1.25 }] } },
+  { id: 'olympus', name: 'Mons Olympus Holdings', shape: 'shield', palette: 'mars', massX: 1, massMul: 1e4, legacyX: 12, par: 500, rating: 600,
+    scale: 2.4, vox: 1.5, startEra: 3, minEra: 3, mods: { rp: 3, value: 0.8 },
+    blurb: 'Off-world. Low gravity. Peasants and steam engines float away, so only Era IV+ equipment works.',
+    relic: { id: 'gravity', name: 'Low-Gravity Patents', desc: 'Research ×1.5 and credits per ton ×1.25, forever.', fx: [{ k: 'rp', x: 1.5 }, { k: 'value', x: 1.25 }] } },
+  { id: 'under', name: 'The Mountain Under the Mountain', shape: 'hollow', palette: 'hollow', massX: 1, massMul: 6e4, legacyX: 15, par: 600, rating: 1000,
+    scale: 2.2, vox: 1.4, mods: { mining: 1.2 }, phase2: { at: 0.5, mods: { value: 2, mining: 0.7 }, name: 'The Inner Mountain' },
+    blurb: 'It is hollow. Something is inside. The something is also a mountain.',
+    relic: { id: 'hollow', name: 'Hollow Earth Lease', desc: '+1 heir candidate and all output ×1.15, forever.', fx: [{ k: 'global', x: 1.15 }] } },
+  { id: 'pangaea', name: 'Pangaea (Remaining)', shape: 'pangaea', palette: 'pangaea', massX: 1, massMul: 2.5e5, legacyX: 25, par: 800, rating: 1600,
+    scale: 2.6, vox: 1.6, mods: { mining: 0.8, extraction: 0.8, processing: 0.8, value: 2, rp: 2, time: 0.9 },
+    blurb: 'The last supercontinent, quietly stockpiled since the Permian. Every rule applies at once.',
+    relic: { id: 'supercal', name: 'The Supercontinental Calendar', desc: 'Years pass ×0.9, forever.', fx: [{ k: 'time', x: 0.9 }] } },
+];
+export const isGiant = def => !!def?.massMul;
+export const RELICS = GIANTS.map(m => ({ ...m.relic, mtn: m.id }));
+export const RELIC_BY_ID = Object.fromEntries(RELICS.map(r => [r.id, r]));
+export const STRATUM_STEP = 0.1;      // giants pay their progress Legacy every 10%, without resetting
+export const MOUNTAIN_BY_ID = Object.fromEntries([...MOUNTAINS, ...GIANTS].map(m => [m.id, m]));
 export const OFFER_SIZE = 3;
 
 export const STRATA = [
@@ -251,6 +279,8 @@ export const SKILLS = [
     apply: (m, l) => { m.extraction *= Math.pow(1.25, l); }, fxt: l => `Extraction ×${(1.25 ** l).toFixed(2)}` },
   { id: 'holes', name: 'Ancestral Holes', desc: 'Grandfather always said: dig the hole bigger than the problem.', dir: 1, d: 2, max: 3, cost: pow(8, 3), req: [['barrow', 1]],
     apply: (m, l) => { m.buffer *= Math.pow(2, l); }, fxt: l => `Buffer size ×${2 ** l}` },
+  { id: 'charter', name: 'Tectonic Charter', desc: 'The family is licensed to acquire geology at continental scale. The lawyers have been fed.', dir: 1, d: 3, max: 1, cost: () => 300, req: [['holes', 2]],
+    fxt: () => 'Unlocks Tectonic Assets: giant mountains at Evolve' },
 
   // Industry (processing) — lower right
   { id: 'furnace', name: 'Family Furnace', desc: 'Never once allowed to go out. Several cousins have tried.', dir: 2, d: 1, max: 5, cost: pow(5, 3), req: [['founder', 1]],
@@ -368,6 +398,8 @@ export const TROPHIES = [
   { id: 'grind',      name: 'Workaholic Dynasty',            desc: 'Spend 30 minutes of Overtime (lifetime).',       fx: { k: 'global', x: 1.02 } },
   { id: 'signed',     name: 'Under Contract',                desc: 'Complete any Board Contract.',                   fx: { k: 'global', x: 1.05 } },
   { id: 'lawyer',     name: "Corporate Lawyer's Dream",      desc: 'Complete every Board Contract.',                 fx: { k: 'global', x: 1.1 } },
+  { id: 'tectonic',   name: 'Tectonic Shift',                desc: 'Liquidate a Tectonic Asset.',                    fx: { k: 'global', x: 1.05 } },
+  { id: 'plates',     name: 'Plate Owner',                   desc: 'Liquidate every Tectonic Asset.',                fx: { k: 'time', x: 0.97 } },
 ];
 export const TROPHY_BY_ID = Object.fromEntries(TROPHIES.map(t => [t.id, t]));
 

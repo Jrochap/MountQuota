@@ -166,7 +166,7 @@ button { font: inherit; color: inherit; }
 @keyframes ticker { from { transform: translateX(100vw); } to { transform: translateX(-100%); } }
 
 /* ── overlays ── */
-.overlay { position: fixed; inset: 0; background: rgba(217, 212, 200, .55); backdrop-filter: blur(2px); display: grid; place-items: center; z-index: 20; padding: 24px; }
+.overlay { position: fixed; inset: 0; background: rgba(217, 212, 200, .55); backdrop-filter: blur(2px); display: grid; place-items: center; grid-template: minmax(0, 1fr) / minmax(0, 1fr); z-index: 20; padding: 24px; }
 .overlay[hidden] { display: none; }
 .overlay.dark { background: rgba(20, 20, 20, .55); }
 .ov-panel { width: min(1320px, 100%); height: min(860px, 100%); display: flex; flex-direction: column; }
@@ -375,3 +375,9 @@ body.no-ticker .memo { bottom: 100px; }
 .ccard .mc-n i { font-style: normal; font-family: var(--f-mono); font-size: 9.5px; color: var(--acc); margin-left: 4px; }
 .mmods b.contract { background: var(--acc); border-color: var(--acc); color: #fff; }
 .node.forbidden { opacity: .3; border-style: dotted; cursor: not-allowed; }
+
+/* Tectonic Assets (giant mountains) */
+.mcard.giant { border-width: 3px; border-left-width: 10px; }
+.mcard.giant .mc-n { font-size: 14px; letter-spacing: .02em; }
+.mc-r.warn { color: var(--ink); opacity: .75; }
+.trophy.relic .t-ic { color: var(--acc); }

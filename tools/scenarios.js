@@ -193,6 +193,44 @@ const SCENARIOS = {
     }
   },
 
+  // Tectonic Assets: how long does each giant take for dynasties of different strength?
+  // Builds a dynasty with the prestige chain (greedy spending), then plays each giant from a copy of it.
+  giants() {
+    const g = newGame();
+    const spend = () => { for (;;) { let best = null; for (const s of SKILLS) { if (s.id === 'founder' || skillState(g, s.id) !== 'affordable') continue; const c = s.cost(g.meta.skills[s.id] || 0); if (!best || c < best.c) best = { s, c }; } if (!best) break; buySkill(g, best.s.id); } };
+    const checkpoints = (ARGS.at || '10,14').split(',').map(Number);
+    out(`TECTONIC ASSETS · dynasty after chain runs ${checkpoints.join(' / ')} · ${ARGS.trials} trial(s) each`);
+    for (let i = 1; i <= Math.max(...checkpoints); i++) {
+      playRun(g); evolve(g); spend();
+      if (!checkpoints.includes(i)) continue;
+      g.meta.skills.charter = 1;
+      out(`  after run ${i}: lifetime ◆${g.meta.legacyTotal} · ${Object.keys(g.meta.skills).length} skills · Obstinate record ${g.meta.records.obstinate?.toFixed(1)}y`);
+      for (const M of GIANTS) {
+        const ys = [], hrs = [], ls = [];
+        let done = 0;
+        for (let k = 0; k < ARGS.trials; k++) {
+          const h = newGame(); h.meta = JSON.parse(JSON.stringify(g.meta));
+          h.run = newRun(h.meta, M.id);
+          const before = h.meta.legacyTotal;
+          const r = playRun(h, { maxYears: 2500, step: 1 });
+          ys.push(r.years); hrs.push(r.realMin / 60); ls.push(h.meta.legacyTotal - before + legacyGain(h)); if (r.complete) done++;
+        }
+        out(`    ${M.name.padEnd(32)} rating ${String(M.rating).padEnd(5)} ${fmtY(ys).padEnd(15)} ${mean(hrs).toFixed(1)}h real  legacy ≈ ${Math.round(mean(ls))}  finished ${done}/${ARGS.trials}`);
+      }
+    }
+
+    // the realistic path: tackle the giants in order with this dynasty, spending Legacy and keeping relics,
+    // with a few normal runs in between to spend the windfall
+    out(`  IN ORDER from the last dynasty (relics kept, Legacy spent, ${ARGS.between ?? 2} normal runs between giants):`);
+    for (const M of GIANTS) {
+      g.meta.pick = M.id; g.run = newRun(g.meta, M.id);
+      const r = playRun(g, { maxYears: 3000, step: 1 });
+      const lt = g.meta.legacyTotal, gain = evolve(g); spend();
+      out(`    ${M.name.padEnd(32)} ${r.complete ? '' : 'NOT DONE '}${r.years.toFixed(0)}y  ${(r.realMin / 60).toFixed(1)}h real  lifetime ◆${lt + gain} (rating ${M.rating})  relics ${Object.keys(g.meta.relics).join(', ')}`);
+      for (let k = 0; k < (ARGS.between ?? 2); k++) { const n = playRun(g); evolve(g); spend(); if (k === 0) out(`      then a normal mountain: ${n.years.toFixed(1)}y`); }
+    }
+  },
+
   // Auto-buy tiers compared on identical setups.
   gary() {
     const trial = (skills, manualResearch, prio) => {

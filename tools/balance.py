@@ -13,13 +13,14 @@ JavaScriptCore via `osascript -l JavaScript`. Uses Node instead if available
   python3 tools/balance.py gary --trials 20
   python3 tools/balance.py heirs --trials 15
   python3 tools/balance.py contracts
+  python3 tools/balance.py giants --at 8,11,14 --trials 1
   python3 tools/balance.py all
 """
 import argparse, json, os, re, shutil, subprocess, sys, tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, 'src')
-SCENARIOS = ['fresh', 'mountains', 'chain', 'oldunits', 'gary', 'heirs', 'contracts', 'all']
+SCENARIOS = ['fresh', 'mountains', 'chain', 'oldunits', 'gary', 'heirs', 'contracts', 'giants', 'all']
 
 
 def strip_module(code):
@@ -57,10 +58,11 @@ def main():
     p.add_argument('scenario', nargs='?', default='fresh', choices=SCENARIOS)
     p.add_argument('--trials', type=int, default=5, help='repetitions per measurement (heir traits add noise)')
     p.add_argument('--runs', type=int, default=12, help='runs in the prestige chain')
+    p.add_argument('--at', default='10,14', help='giants: chain runs after which to test the dynasty')
     p.add_argument('--node', action='store_true', help='force Node.js instead of JavaScriptCore')
     a = p.parse_args()
 
-    code = bundle({'scenario': a.scenario, 'trials': a.trials, 'runs': a.runs})
+    code = bundle({'scenario': a.scenario, 'trials': a.trials, 'runs': a.runs, 'at': a.at})
     with tempfile.NamedTemporaryFile('w', suffix='.js', delete=False) as f:
         f.write(code)
         path = f.name

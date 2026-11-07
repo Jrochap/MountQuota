@@ -5,7 +5,7 @@ import {
   SEC_PER_YEAR, GEN_YEARS, MASS_K, MASS_M0, STRATA, MOUNTAINS, MOUNTAIN_BY_ID, OFFER_SIZE, BASE_VALUE, RP_PER_TON, BUFFER_SECONDS, BUFFER_MIN,
   DEFERRED_RATE, DEFERRED_CAP, OVERTIME_X, COST_GROWTH, WORKFORCE, MILESTONES, MILESTONE_X, DEPRECIATION, GARY_SAVE_SECONDS, GARY_SAVE_ADVANTAGE, GARY_BALANCE, LEGACY_BONUS, LEGACY_PROGRESS, LEGACY_COMPLETE, PAR_YEARS,
   CATS, UNITS, RESEARCH, RESEARCH_BY_ID, SKILLS, SKILL_BY_ID, TRUST_FUND,
-  FIRST_NAMES, TRAITS, FOUNDER_TRAIT, softenTrait, EVENTS, TROPHIES, TROPHY_BY_ID, CONTRACTS, CONTRACT_BY_ID, SUCCESSION_SECONDS, HEIR_BIOS, BOARD_PICK_LINES,
+  FIRST_NAMES, TRAITS, FOUNDER_TRAIT, softenTrait, EVENTS, TROPHIES, TROPHY_BY_ID, CONTRACTS, CONTRACT_BY_ID, GIANTS, isGiant, RELICS, RELIC_BY_ID, STRATUM_STEP, SUCCESSION_SECONDS, HEIR_BIOS, BOARD_PICK_LINES,
 } from './data.js';
 
 const CAT_IDS = CATS.map(c => c.id);
@@ -20,7 +20,7 @@ export function roman(n) {
 // ── Meta (persists across runs) ──────────────────────────────
 export function newMeta() {
   return { legacy: 0, legacyTotal: 0, skills: { founder: 1 }, runs: 0, bestYears: null, records: {}, history: [], offer: null, pick: null, deferred: 0,
-    trophies: {}, contracts: {}, contractPick: null,
+    trophies: {}, contracts: {}, contractPick: null, relics: {},
     stats: { clicks: 0, memos: 0, gambleWins: 0, heirs: 0, overtime: 0 } };
 }
 
@@ -31,7 +31,7 @@ export function makeHeir(gen, meta) {
 }
 // distinct candidates (names, traits, bios); Selective Succession → 4 candidates, all good traits
 export function heirCandidates(gen, meta) {
-  const n = meta.skills.breeding ? 4 : 3;
+  const n = (meta.skills.breeding ? 4 : 3) + (meta.relics?.hollow ? 1 : 0);
   const pool = TRAITS.filter(t => !t.rare || Math.random() < 0.2);
   const shuffle = a => a.map(v => [Math.random(), v]).sort((x, y) => x[0] - y[0]).map(v => v[1]);
   const traits = shuffle(pool), names = shuffle(FIRST_NAMES), bios = shuffle(HEIR_BIOS);
@@ -53,7 +53,14 @@ export function chooseHeir(g, i, byBoard = false) {
 
 // ── Mountains ────────────────────────────────────────────────
 export const mtnDef = r => MOUNTAIN_BY_ID[r.mtn?.id] || MOUNTAINS[0];
-export const massK = r => MASS_K * mtnDef(r).massX + (r.contract === 'mandate' ? Math.log(CONTRACT_BY_ID.mandate.massMul) : 0);
+export const massK = r => MASS_K * mtnDef(r).massX + Math.log(mtnDef(r).massMul || 1) + (r.contract === 'mandate' ? Math.log(CONTRACT_BY_ID.mandate.massMul) : 0);
+// Tectonic Assets need the Tectonic Charter
+export const giantsUnlocked = meta => (meta.skills.charter || 0) > 0;
+// the oldest era whose equipment works on this mountain (Mons Olympus: low gravity)
+export const minEra = r => mtnDef(r).minEra || 0;
+// past the halfway point of The Mountain Under the Mountain, the inner mountain's rules apply
+export const mtnPhase = r => { const p = mtnDef(r).phase2; return p && volumeFrac(r) >= p.at ? 2 : 1; };
+export const mtnMods = r => (mtnPhase(r) === 2 ? mtnDef(r).phase2.mods : mtnDef(r).mods);
 export const massOf = r => MASS_M0 * (Math.exp(massK(r)) - 1);
 export function mountainOffer(g) {
   const meta = g.meta;
@@ -64,17 +71,22 @@ export function mountainOffer(g) {
     meta.offer = pool.slice(0, OFFER_SIZE).sort(() => Math.random() - 0.5);
     meta.pick = meta.offer[0];
   }
-  if (!meta.offer.includes(meta.pick)) meta.pick = meta.offer[0];
+  const giantPick = isGiant(MOUNTAIN_BY_ID[meta.pick]) && giantsUnlocked(meta);
+  if (!meta.offer.includes(meta.pick) && !giantPick) meta.pick = meta.offer[0];
   return meta.offer;
 }
-export function pickMountain(g, id) { if (mountainOffer(g).includes(id)) g.meta.pick = id; }
+export function pickMountain(g, id) {
+  if (mountainOffer(g).includes(id) || (isGiant(MOUNTAIN_BY_ID[id]) && giantsUnlocked(g.meta))) g.meta.pick = id;
+}
 
 export function newRun(meta, mtnId = 'obstinate', contract = null) {
   const units = {};
   for (const c of CAT_IDS) units[c] = UNITS[c].map(() => 0);
   for (const c of CAT_IDS) units[c][0] = 1;
-  const sk = meta.skills;
-  const skip = sk.skip3 ? 3 : sk.skip2 ? 2 : sk.skip1 ? 1 : 0;
+  const sk = meta.skills, def = MOUNTAIN_BY_ID[mtnId] || MOUNTAINS[0];
+  const skip = Math.max(sk.skip3 ? 3 : sk.skip2 ? 2 : sk.skip1 ? 1 : 0, def.startEra || 0);
+  if (isGiant(def)) contract = null;              // no Board Contracts on giants
+  if (def.minEra) for (const c of CAT_IDS) units[c][0] = 0;
   const run = {
     t: 0, years: 0, credits: 20 + TRUST_FUND[sk.trust || 0], rp: 0,
     mined: 0, face: 0, yard: 0, processed: 0, earned: 0, rpEarned: 0,
@@ -87,6 +99,7 @@ export function newRun(meta, mtnId = 'obstinate', contract = null) {
     eraYears: [0],
     // the very first mountain uses the classic seed; later ones are randomised
     contract,
+    legacyPaid: 0, strataPaid: 0,
     mtn: { id: mtnId, seed: meta.runs === 0 && mtnId === 'obstinate' ? 7 : 1 + Math.floor(Math.random() * 1e6) },
   };
   for (const n of RESEARCH) if (n.era < skip) run.research[n.id] = true;
@@ -114,7 +127,8 @@ export function getMods(g) {
   for (const n of RESEARCH) if (r.research[n.id]) applyFx(m, n.fx);
   for (const s of SKILLS) { const l = meta.skills[s.id] || 0; if (l > 0 && s.apply) s.apply(m, l); }
   if (r.heir) for (const k in r.heir.trait.mods) m[k] *= r.heir.trait.mods[k];
-  const mm = mtnDef(r).mods; for (const k in mm) m[k] *= mm[k];
+  const mm = mtnMods(r); for (const k in mm) m[k] *= mm[k];
+  for (const id in meta.relics || {}) for (const e of RELIC_BY_ID[id]?.fx || []) m[e.k] *= e.x;
   for (const b of r.buffs) m[b.k] *= b.x;
   if (r.overtime && meta.deferred > 0) m.global *= OVERTIME_X;
   for (const id in meta.trophies || {}) { const tr = TROPHY_BY_ID[id]; if (tr) m[tr.fx.k] *= tr.fx.x; }
@@ -213,6 +227,20 @@ export function tick(g, dt, offline = false) {
 
   r.buffs = r.buffs.filter(b => b.until > r.t);
 
+  // Tectonic Assets: progress Legacy is paid out every stratum, without resetting
+  if (isGiant(mtnDef(r))) {
+    const k = Math.floor(volumeFrac(r) / STRATUM_STEP + 1e-9);
+    while ((r.strataPaid || 0) < k) {
+      r.strataPaid = (r.strataPaid || 0) + 1;
+      const due = Math.max(0, progressLegacy(r, Math.min(1, r.strataPaid * STRATUM_STEP)) - (r.legacyPaid || 0));
+      r.legacyPaid = (r.legacyPaid || 0) + due;
+      g.meta.legacy += due; g.meta.legacyTotal += due;
+      g.out.push({ type: 'stratum', k: r.strataPaid, gain: due });
+    }
+    const ph = mtnPhase(r);
+    if (ph === 2 && !r.phase2Seen) { r.phase2Seen = true; g.out.push({ type: 'phase2' }); }
+  }
+
   r._trophyT = (r._trophyT || 0) + dt;
   if (r._trophyT >= 1) { r._trophyT = 0; checkTrophies(g, R); }
 
@@ -271,6 +299,8 @@ export const TROPHY_CHECKS = {
   succession: (g) => (g.meta.stats?.heirs || 0) >= 20,
   grind:      (g) => (g.meta.stats?.overtime || 0) >= 1800,
   signed:     (g) => Object.keys(g.meta.contracts).length >= 1 || contractPassed(g.run),
+  tectonic:   (g) => GIANTS.some(m => g.meta.records[m.id] != null) || (g.run.complete && isGiant(mtnDef(g.run))),
+  plates:     (g) => GIANTS.every(m => g.meta.records[m.id] != null || (g.run.complete && g.run.mtn.id === m.id)),
   lawyer:     (g) => CONTRACTS.every(c => g.meta.contracts[c.id] != null || (g.run.contract === c.id && contractPassed(g.run))),
 };
 // best finish time so far, counting a just-completed run before it is banked by evolve()
@@ -323,7 +353,7 @@ export function resolveAmt(g, cat, e, amt) {
 }
 export function buyUnit(g, cat, e, amt = 1) {
   const r = g.run;
-  if (e > r.era) return false;
+  if (e > r.era || e < minEra(r)) return false;
   let n = resolveAmt(g, cat, e, amt);
   if (amt === 'max') while (n > 1 && unitCost(g, cat, e, n) > r.credits) n--;   // float-rounding guard
   const cost = unitCost(g, cat, e, n);
@@ -343,7 +373,7 @@ function buyCount(g, cat, e, n) {
 
 function bestUnit(g, cat, m) {
   let best = -1, score = 0;
-  for (let e = 0; e <= g.run.era; e++) {
+  for (let e = minEra(g.run); e <= g.run.era; e++) {
     const c = unitCost(g, cat, e, 1);
     if (c > g.run.credits) continue;
     const s = gainOf(g, cat, e, 1, m) / c;
@@ -386,7 +416,7 @@ export function smartBuy(g, m) {
       // Linear beat squared/flat weightings in the balance sim.
       const lead = R[c] / Math.max(minR, 1e-9);
       const w = lead <= GARY_BALANCE ? 1 : Math.max(1e-4, GARY_BALANCE / lead);
-      for (let e = 0; e <= r.era; e++) {
+      for (let e = minEra(r); e <= r.era; e++) {
         const own = r.units[c][e], nx = nextMilestone(own);
         const opts = [1];
         if (nx && nx[0] - own > 1 && nx[0] - own <= 40) opts.push(nx[0] - own);
@@ -532,12 +562,15 @@ export function contractX(r) {
 export const contractPassed = r => { const c = CONTRACT_BY_ID[r.contract]; return !!c && r.complete && (c.deadline == null || r.finishYears <= c.deadline); };
 export function pickContract(g, id) { g.meta.contractPick = CONTRACT_BY_ID[id] ? id : null; }
 export const contractsUnlocked = meta => Object.keys(meta.records || {}).length > 0;
+const progressLegacy = (r, f) => Math.floor(LEGACY_PROGRESS * Math.pow(f, 1.2) * mtnDef(r).legacyX);
+export const parYears = r => mtnDef(r).par || PAR_YEARS;
+// Legacy still to be banked on evolve (giants have already paid part of it, stratum by stratum)
 export function legacyGain(g) {
   const r = g.run;
   const f = volumeFrac(r);
   let L = LEGACY_PROGRESS * Math.pow(f, 1.2);
-  if (r.complete) L += LEGACY_COMPLETE * Math.sqrt(clamp(PAR_YEARS / Math.max(0.5, r.finishYears), 0.25, 400));
-  return Math.floor(L * mtnDef(r).legacyX * contractX(r));
+  if (r.complete) L += LEGACY_COMPLETE * Math.sqrt(clamp(parYears(r) / Math.max(0.5, r.finishYears), 0.25, 400));
+  return Math.max(0, Math.floor(L * mtnDef(r).legacyX * contractX(r)) - (r.legacyPaid || 0));
 }
 export function evolve(g) {
   const gain = legacyGain(g), r = g.run, meta = g.meta;
@@ -545,10 +578,12 @@ export function evolve(g) {
   if (r.complete && (meta.bestYears == null || r.finishYears < meta.bestYears)) meta.bestYears = r.finishYears;
   const id = mtnDef(r).id;
   if (r.complete && (meta.records[id] == null || r.finishYears < meta.records[id])) meta.records[id] = r.finishYears;
+  const relic = mtnDef(r).relic;
+  if (r.complete && relic && !(meta.relics || (meta.relics = {}))[relic.id]) { meta.relics[relic.id] = Date.now(); g.out.push({ type: 'relic', id: relic.id }); }
   if (contractPassed(r) && (meta.contracts[r.contract] == null || r.finishYears < meta.contracts[r.contract])) meta.contracts[r.contract] = r.finishYears;
   meta.history.unshift({
     run: meta.runs, years: r.complete ? r.finishYears : r.years, complete: r.complete,
-    pct: volumeFrac(r), legacy: gain, era: r.era, gens: r.gen + 1, mtn: id, contract: r.contract || null,
+    pct: volumeFrac(r), legacy: gain + (r.legacyPaid || 0), era: r.era, gens: r.gen + 1, mtn: id, contract: r.contract || null,
     contractOk: r.contract ? contractPassed(r) : null,
   });
   meta.history = meta.history.slice(0, 30);

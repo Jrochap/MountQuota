@@ -44,7 +44,16 @@ Add `?speed=20` to the URL to fast-forward while testing.
   multiplier. On every Evolution the board offers 3 to pick from, and records are kept per mountain.
 - **Sound**: fully synthesized with Web Audio, so there are no asset files. One-shot effects, a concrete-hall reverb,
   an ambient bed per era and machinery rhythms that follow what you own. Press **M** to mute; volumes are in the Ledger.
-- **Shareholder Trophies**: 24 permanent achievements, such as records under 100/50/20/5 years, liquidating every
+- **Tectonic Assets** (giant mountains, unlocked by the *Tectonic Charter* in the Family Tree's Logistics branch):
+  always on offer at Evolve, with 1,000s to 100,000s of times the tonnage. Each one shows a *Recommended Dynasty Rating*
+  (your lifetime Legacy). They're drawn with 3–5× more voxels, set behind the diorama with the camera zoomed out.
+  - *The Continental Shelf*: a terraced continent; extraction is the permanent bottleneck.
+  - *Mons Olympus Holdings*: off-world; starts in Era IV and older equipment floats away. Research ×3.
+  - *The Mountain Under the Mountain*: past 50% the grey shell is gone and a golden inner mountain is left: credits ×2, mining ×0.7.
+  - *Pangaea (Remaining)*: every landform and every modifier at once.
+  - Legacy is paid out every 10% mined, without resetting. The first liquidation of each giant grants a permanent **Relic**
+    (Gary Works Weekends, Low-Gravity Patents, Hollow Earth Lease, The Supercontinental Calendar). Board Contracts can't be signed on giants.
+- **Shareholder Trophies**: 26 permanent achievements, such as records under 100/50/20/5 years, liquidating every
   mountain, ₵1Qa in the bank, 400 peasants, 1,000 Founder clicks and winning 10 gambles. Each pays a small
   permanent bonus.
 - **Board Contracts** (unlocked after your first liquidation): optional rule twists you sign at Evolve for the next
@@ -82,6 +91,7 @@ python3 tools/balance.py oldunits         # how much output comes from buying ol
 python3 tools/balance.py gary --trials 20 # auto-buy tiers compared
 python3 tools/balance.py heirs --trials 20 # does choosing the heir matter?
 python3 tools/balance.py contracts         # Board Contracts, fresh vs veteran
+python3 tools/balance.py giants --at 8     # Tectonic Assets: each giant, then all four in order
 python3 tools/balance.py all
 ```
 Random heir traits add noise of about ±5 years per run, so use `--trials 20` before trusting small differences.
@@ -90,3 +100,5 @@ Current numbers: first run ≈ 100 years (~33 min of real time; trophies earned 
 The prestige curve goes 98 → 63 → 40 → 25 → 18 → 14 → 11 → 9.5. All 14 mountains land between about 98 and 118 years.
 About 38% of the output gained comes from buying older units. Gary's MBA runs about 11% faster than basic Gary.
 For a veteran, contracts trade about 25–40% more time for 40–60% more Legacy; Quarterly Deadline pays about ×2.5.
+Tectonic Assets, tackled in order by a dynasty around run 8 (lifetime ◆~380): Shelf ≈ 500 years, Olympus ≈ 445,
+Under the Mountain ≈ 370, Pangaea ≈ 710. That's about 2.5–5.5 hours of real play each.

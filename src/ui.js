@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────────────────────
 import {
   GAME_TITLE, COMPANY, MOUNTAINS, MOUNTAIN_BY_ID, FX_LABEL, ERAS, CATS, UNITS, RESEARCH, RESEARCH_BY_ID, RD_ROWS, SKILLS, SKILL_BY_ID,
-  EVENTS, NEWS, fxText, LEGACY_BONUS, PAR_YEARS, TROPHIES, TROPHY_BY_ID, CONTRACTS, CONTRACT_BY_ID,
+  EVENTS, NEWS, fxText, LEGACY_BONUS, PAR_YEARS, TROPHIES, TROPHY_BY_ID, CONTRACTS, CONTRACT_BY_ID, GIANTS, RELICS, RELIC_BY_ID, isGiant,
 } from './data.js';
 import * as S from './sim.js';
 import { fmt, tons, cr, rp, pct, clock, yrs } from './format.js';
@@ -21,6 +21,9 @@ const zoomer = id => `<div class="zoomer" data-zoomer="${id}"><button class="chi
 const modsText = def => {
   const parts = Object.entries(def.mods).map(([k, v]) => `<b class="${v >= 1 ? 'up' : 'down'}">${esc(FX_LABEL[k])} ×${v}</b>`);
   if (def.massX !== 1) parts.push(`<b class="${def.massX > 1 ? 'down' : 'up'}">Tonnage ×${fmt(Math.exp(Math.log(1e11) * (def.massX - 1)))}</b>`);
+  if (def.massMul) parts.push(`<b class="down">Tonnage ×${fmt(def.massMul)}</b>`);
+  if (def.minEra) parts.push(`<b class="down">Era ${ERAS[def.minEra].roman}+ equipment only</b>`);
+  if (def.phase2) parts.push(`<b class="up">Past ${Math.round(def.phase2.at * 100)}%: ${Object.entries(def.phase2.mods).map(([k, v]) => `${esc(FX_LABEL[k])} ×${v}`).join(', ')}</b>`);
   return parts.length ? parts.join(' ') : '<b>No modifiers. Just rock.</b>';
 };
 
@@ -316,7 +319,11 @@ export class UI {
     setHTML($('#trophies'), `<p class="dim small">Permanent achievements across every run. Each one pays a small bonus forever. Lifetime: ${fmt(st.clicks || 0)} clicks · ${fmt(st.memos || 0)} memos answered · ${fmt(st.gambleWins || 0)} gambles won · ${fmt(st.heirs || 0)} heirs chosen · ${Math.floor((st.overtime || 0) / 60)} min of Overtime.</p>
       <div class="trophies">${TROPHIES.map(t => `<div class="trophy ${got[t.id] ? 'got' : ''}">
         <span class="t-ic">${got[t.id] ? '★' : '☆'}</span><span class="t-n">${esc(t.name)}</span>
-        <span class="t-d">${esc(t.desc)}</span><span class="t-r mono">${esc(fxText([t.fx]))}</span></div>`).join('')}</div>`);
+        <span class="t-d">${esc(t.desc)}</span><span class="t-r mono">${esc(fxText([t.fx]))}</span></div>`).join('')}</div>
+      ${S.giantsUnlocked(this.g.meta) || Object.keys(this.g.meta.relics || {}).length ? `<h3>RELICS</h3><p class="dim small">Earned by liquidating a Tectonic Asset for the first time.</p>
+      <div class="trophies">${RELICS.map(t => { const own = this.g.meta.relics?.[t.id]; return `<div class="trophy relic ${own ? 'got' : ''}">
+        <span class="t-ic">${own ? '◆' : '◇'}</span><span class="t-n">${esc(t.name)}</span>
+        <span class="t-d">${own ? '' : 'Liquidate ' + esc(MOUNTAIN_BY_ID[t.mtn].name) + '. '}${esc(t.desc)}</span></div>`; }).join('')}</div>` : ''}`);
   }
 
   renderSuccession() {
@@ -507,7 +514,9 @@ export class UI {
           <span class="mc-m">${modsText(d)}</span>
           <span class="mc-r mono">LEGACY ×${d.legacyX} · ${rec != null ? 'RECORD ' + yrs(rec) : 'UNMINED'}</span></button>`;
       }).join('')}</div>
-      ${S.contractsUnlocked(g.meta) ? `<h4>BOARD CONTRACT (OPTIONAL)</h4>
+      ${this.giantsHTML()}
+      ${isGiant(MOUNTAIN_BY_ID[g.meta.pick]) ? '<p class="dim small">Board Contracts cannot be signed on Tectonic Assets. The lawyers refused to read that much geology.</p>'
+      : S.contractsUnlocked(g.meta) ? `<h4>BOARD CONTRACT (OPTIONAL)</h4>
       <div class="contracts">
         <button class="ccard ${!g.meta.contractPick ? 'on' : ''}" data-contract=""><span class="mc-n">No contract</span><span class="mc-b">Business as usual.</span></button>
         ${CONTRACTS.map(c => `<button class="ccard ${g.meta.contractPick === c.id ? 'on' : ''}" data-contract="${c.id}">
@@ -517,6 +526,22 @@ export class UI {
       <p class="dim small">Legacy = progress bonus (${pct(f, 0)} liquidated)${r.complete ? ' + completion bonus (faster = more)' : '. Finish the mountain for a large completion bonus; the faster, the bigger.'}</p>
       <button class="btn big ${gain > 0 ? '' : 'disabled'}" data-evolve>${this.armed ? 'CONFIRM — RESET THIS RUN' : 'EVOLVE ▶'}</button>
       <p class="dim small">You keep: Legacy, Family Tree, records. You lose: everything else, emotionally included.</p>`;
+  }
+  // Tectonic Assets: giant mountains, always on offer once the Tectonic Charter is inherited
+  giantsHTML() {
+    const meta = this.g.meta;
+    if (!S.giantsUnlocked(meta)) return meta.legacyTotal >= 150
+      ? '<p class="dim small"><b>TECTONIC ASSETS</b> — giant mountains for a well-upgraded dynasty. Requires the <b>Tectonic Charter</b> (Logistics branch).</p>' : '';
+    return `<h4>TECTONIC ASSETS — GIANT MOUNTAINS <span class="dim">· YOUR DYNASTY RATING ${fmt(meta.legacyTotal)}</span></h4>
+      <div class="offer giants">${GIANTS.map(d => {
+        const rec = meta.records[d.id], ready = meta.legacyTotal >= d.rating, got = meta.relics?.[d.relic.id];
+        return `<button class="mcard giant ${meta.pick === d.id ? 'on' : ''}" data-mtn="${d.id}">
+          <span class="mc-n">${esc(d.name)}</span><span class="mc-b">${esc(d.blurb)}</span>
+          <span class="mc-m">${modsText(d)}</span>
+          <span class="mc-r ${ready ? '' : 'warn'}">RECOMMENDED RATING ${fmt(d.rating)}${ready ? ' ✓' : ` · the board advises against it (you have ${fmt(meta.legacyTotal)})`}</span>
+          <span class="mc-r">${got ? '✓ RELIC OWNED' : 'RELIC ON FIRST CLEAR'}: <b>${esc(d.relic.name)}</b> — ${esc(d.relic.desc)}</span>
+          <span class="mc-r mono">LEGACY ×${d.legacyX} · PAID EVERY 10% · PAR ${d.par}Y · ${rec != null ? 'RECORD ' + yrs(rec) : 'UNMINED'}</span></button>`;
+      }).join('')}</div>`;
   }
   evolveClick(btn) {
     if (S.legacyGain(this.g) <= 0) return;
@@ -546,11 +571,12 @@ export class UI {
         <dt>Founder clicks</dt><dd>${fmt(r.clicks)} (${tons(r.clickTons)})</dd>
         ${r.eraYears.map((y, i) => y != null ? `<dt>Era ${ERAS[i].roman} reached</dt><dd>year ${y.toFixed(1)}</dd>` : '').join('')}
       </dl>
+      ${isGiant(S.mtnDef(r)) ? `<h3>TECTONIC ASSET</h3><p class="small"><b>${esc(S.mtnDef(r).name)}</b> — Legacy paid so far: ◆${fmt(r.legacyPaid || 0)} (${r.strataPaid || 0}/10 strata). Relic on liquidation: <b>${esc(S.mtnDef(r).relic.name)}</b>.</p>` : ''}
       ${r.contract ? `<h3>ACTIVE CONTRACT</h3><p class="small"><b>${esc(CONTRACT_BY_ID[r.contract].name)}</b> — ${esc(CONTRACT_BY_ID[r.contract].rule)} Pays Legacy ×${CONTRACT_BY_ID[r.contract].legacyX} if you finish${CONTRACT_BY_ID[r.contract].deadline ? ' in time' : ''}.</p>` : ''}
       <h3>DYNASTY RECORDS</h3>
       <dl class="grid">
         <dt>Best liquidation (any)</dt><dd>${yrs(m.bestYears)}</dd>
-        ${MOUNTAINS.map(d => `<dt>${esc(d.name)}</dt><dd>${m.records[d.id] != null ? yrs(m.records[d.id]) : '—'}</dd>`).join('')}
+        ${[...MOUNTAINS, ...(S.giantsUnlocked(m) ? GIANTS : [])].map(d => `<dt>${esc(d.name)}</dt><dd>${m.records[d.id] != null ? yrs(m.records[d.id]) : '—'}</dd>`).join('')}
         <dt>Par</dt><dd>${PAR_YEARS} yrs</dd>
         <dt>Runs</dt><dd>${m.runs}</dd>
         <dt>Lifetime Legacy</dt><dd>◆${fmt(m.legacyTotal)}</dd>
@@ -586,6 +612,10 @@ export class UI {
         ${m.auto ? `<button class="chip auto ${r.autoOn[c.id] ? 'on' : ''}" data-auto="${c.id}" title="Gary from Procurement buys the most cost-effective unit">AUTO ${r.autoOn[c.id] ? 'ON' : 'OFF'}</button>` : ''}</div>`;
       for (let e = 0; e <= Math.min(ERAS.length - 1, r.era + 1); e++) {
         const u = UNITS[c.id][e];
+        if (e < S.minEra(r)) {
+          html += `<div class="unit locked"><div class="u-era">${ERAS[e].roman}</div><div class="u-main"><div class="u-name">${esc(u.name)}</div><div class="u-desc">Floats away in the low gravity. Not available on this mountain.</div></div></div>`;
+          continue;
+        }
         if (e > r.era) {
           html += `<div class="unit locked"><div class="u-era">${ERAS[e].roman}</div><div class="u-main"><div class="u-name">▒▒▒▒▒▒▒▒</div><div class="u-desc">Requires Generational Leap to Era ${ERAS[e].roman}.</div></div></div>`;
           continue;
@@ -765,6 +795,16 @@ export class UI {
       this.sfx('skill');
       this.toast(`★ TROPHY — ${t.name}`, `${t.desc} Permanent bonus: ${fxText([t.fx])}.`);
       if (this.open === 'trophies') this.renderTrophies();
+    } else if (ev.type === 'stratum') {
+      this.sfx('research');
+      this.toast(`STRATUM ${ev.k * 10}% — DIVIDEND PAID`, `The board pays +◆${fmt(ev.gain)} Legacy now, no Evolution required. The shareholders are emotional.`);
+    } else if (ev.type === 'phase2') {
+      this.sfx('leap');
+      this.toast(`IT'S HOLLOW — ${S.mtnDef(this.run).phase2.name.toUpperCase()}`, 'There is another mountain inside the mountain. It is smaller, denser and worth twice as much. Mining is harder in the dark.');
+    } else if (ev.type === 'relic') {
+      const t = RELIC_BY_ID[ev.id];
+      this.sfx('complete');
+      this.toast(`◆ RELIC — ${t.name}`, `${t.desc}`);
     } else if (ev.type === 'overtimeEnd') {
       this.toast('OVERTIME OVER', 'The Deferred Time bank is empty. The workers collapse into a well-earned 4-minute break.');
     } else if (ev.type === 'milestone') {
@@ -785,6 +825,7 @@ export class UI {
       <p>After <b>${r.finishYears.toFixed(1)} years</b> and <b>${r.gen + 1} generations</b>, the mountain has been fully converted into gravel, money, and a strongly worded documentary.</p>
       ${record ? '<p class="acc"><b>NEW RECORD FOR THIS MOUNTAIN.</b> The family portrait has been updated.</p>' : `<p class="dim">Dynasty record here: ${yrs(best)}.</p>`}
       ${r.contract ? `<p class="${S.contractPassed(r) ? 'acc' : 'dim'}"><b>CONTRACT ${S.contractPassed(r) ? 'FULFILLED' : 'FAILED'}:</b> ${esc(CONTRACT_BY_ID[r.contract].name)} · Legacy ×${S.contractX(r)}</p>` : ''}
+      ${isGiant(S.mtnDef(r)) ? `<p class="acc"><b>TECTONIC ASSET LIQUIDATED.</b> Relic: ${esc(S.mtnDef(r).relic.name)} — ${esc(S.mtnDef(r).relic.desc)} (granted on Evolve${this.g.meta.relics?.[S.mtnDef(r).relic.id] ? ', already owned' : ''}). Strata dividends paid: ◆${fmt(r.legacyPaid || 0)}.</p>` : ''}
       <div class="gain">+◆${fmt(gain)} <span>LEGACY ON EVOLVE</span></div>
       <div class="memo-o">
         <button class="btn big" data-act="toEvolve">CHOOSE NEXT MOUNTAIN ▶</button>
