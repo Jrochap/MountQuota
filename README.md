@@ -4,7 +4,9 @@
 An isometric, tilt-shifted, brutalist idle game about a family that spends several generations
 turning a mountain into money. The goal is to liquidate the whole mountain in as few years as possible.
 
-## Run it
+**Play it:** https://jrochap.github.io/MountQuota/
+
+## Run it locally
 ```
 python3 serve.py --open        # http://127.0.0.1:8642/
 ```
@@ -52,5 +54,19 @@ Add `?speed=20` to the URL to fast-forward while testing.
 | `src/audio.js` | Procedural sound: effects, per-era ambience, machinery rhythm |
 | `src/main.js` | Loop, save/load (localStorage), offline progress |
 
-## Balance (greedy simulated player)
-Run 1 ≈ 105 years (~35 min of real time at 20 s/year; eras at years 12/22/36/55/79). Run 2 ≈ 58, run 3 ≈ 48, and about 10 years by run 10. Fresh runs on all 8 mountains land between 103 and 117 years. In a fresh run, about 38% of the output gained comes from buying older units.
+## Balance
+`tools/balance.py` plays the real game logic (`src/data.js` + `src/sim.js`) headless with a greedy player.
+It needs nothing extra on macOS (it uses the built-in JavaScriptCore), or it can use Node (`--node`).
+```
+python3 tools/balance.py                  # fresh-run pacing on Mt. Obstinate
+python3 tools/balance.py mountains        # first run on every mountain
+python3 tools/balance.py chain --runs 12  # prestige curve with greedy Legacy spending
+python3 tools/balance.py oldunits         # how much output comes from buying older units
+python3 tools/balance.py gary --trials 20 # auto-buy tiers compared
+python3 tools/balance.py all
+```
+Random heir traits add noise of about ±5 years per run, so use `--trials 20` before trusting small differences.
+
+Current numbers: first run ≈ 115 years (~38 min of real time), with eras at years 12/23/37/58/86. The prestige curve goes
+111 → 74 → 49 → 40 → 28 → 24 → 16 → 13. All 8 mountains land between 110 and 119 years. About 37% of the output
+gained comes from buying older units. Gary's MBA runs about 11% faster than basic Gary.

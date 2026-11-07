@@ -17,6 +17,7 @@ const setHTML = (el, v) => { if (el._html !== v) { el._html = v; el.innerHTML = 
 const setClass = (el, v) => { if (el.className !== v) el.className = v; };
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
+const zoomer = id => `<div class="zoomer" data-zoomer="${id}"><button class="chip" data-zoom="${id}:-" title="Zoom out (or pinch / ctrl+scroll)">−</button><span class="mono z-v">100%</span><button class="chip" data-zoom="${id}:+" title="Zoom in">+</button><button class="chip" data-zoom="${id}:fit" title="Fit the whole tree">FIT</button></div>`;
 const modsText = def => {
   const parts = Object.entries(def.mods).map(([k, v]) => `<b class="${v >= 1 ? 'up' : 'down'}">${esc(FX_LABEL[k])} ×${v}</b>`);
   if (def.massX !== 1) parts.push(`<b class="${def.massX > 1 ? 'down' : 'up'}">Tonnage ×${fmt(Math.exp(Math.log(1e11) * (def.massX - 1)))}</b>`);
@@ -106,10 +107,11 @@ export class UI {
         <div class="ov-head">
           <h2>R&amp;D — RESEARCH &amp; DOWNSIZING</h2>
           <div class="rdauto" id="rd-auto"></div>
+          ${zoomer('rd')}
           <div class="ov-stat mono" id="rd-rp"></div>
           <button class="x btn" data-close>✕</button>
         </div>
-        <div class="ov-body"><div class="tree" id="rd-tree"></div></div>
+        <div class="ov-body pan" id="rd-body"><div class="tree" id="rd-tree"></div></div>
         <div class="ov-info" id="rd-info">Hover a node. Click to research. Generational Leaps unlock the next era of equipment.</div>
       </div>
     </div>
@@ -118,11 +120,12 @@ export class UI {
       <div class="ov-panel panel">
         <div class="ov-head">
           <h2>FAMILY TREE — PERMANENT INHERITANCE</h2>
+          ${zoomer('fam')}
           <div class="ov-stat mono" id="fam-l"></div>
           <button class="x btn" data-close>✕</button>
         </div>
         <div class="fam-wrap">
-          <div class="ov-body" id="fam-body"><div class="tree" id="fam-tree"></div></div>
+          <div class="ov-body pan" id="fam-body"><div class="tree" id="fam-tree"></div></div>
           <div class="evolve panel" id="evolve"></div>
         </div>
         <div class="ov-info" id="fam-info">Skills bought here persist forever. Legacy ◆ is earned by Evolving the Dynasty.</div>
@@ -152,6 +155,8 @@ export class UI {
     this.applyTicker();
     this.buildRD();
     this.buildFam();
+    this.zoom = { rd: 1, fam: 1 };
+    this.bindPan('rd'); this.bindPan('fam');
     this.markAmt();
   }
 
@@ -195,6 +200,7 @@ export class UI {
     if (t.dataset.mtn) { S.pickMountain(this.g, t.dataset.mtn); this.sfx('select'); return this.renderEvolve(); }
     if (t.dataset.evolve != null) return this.evolveClick(t);
     if (t.dataset.act) return this.actions[t.dataset.act]?.(t);
+    if (t.dataset.zoom) { const [id, op] = t.dataset.zoom.split(':'); return this.zoomTree(id, op); }
     if (t.dataset.rprio) { this.g.settings.researchPriority = t.dataset.rprio; this.sfx('select'); return this.renderRdAuto(); }
     if (t.dataset.set) {
       const k = t.dataset.set, s = this.g.settings;
@@ -241,6 +247,51 @@ export class UI {
     addEventListener('blur', stop);
   }
 
+  // ── tree navigation: drag to pan, zoom buttons, pinch / ctrl+wheel ──
+  bindPan(id) {
+    const body = $(`#${id}-body`);
+    let drag = null;
+    body.addEventListener('pointerdown', e => {
+      if (e.button !== 0 || e.target.closest('.node, button')) return;
+      drag = { x: e.clientX, y: e.clientY, l: body.scrollLeft, t: body.scrollTop, id: e.pointerId };
+      body.setPointerCapture(e.pointerId); body.classList.add('dragging');
+    });
+    body.addEventListener('pointermove', e => {
+      if (!drag) return;
+      body.scrollLeft = drag.l - (e.clientX - drag.x);
+      body.scrollTop = drag.t - (e.clientY - drag.y);
+    });
+    const end = () => { if (drag) { body.releasePointerCapture?.(drag.id); drag = null; body.classList.remove('dragging'); } };
+    body.addEventListener('pointerup', end); body.addEventListener('pointercancel', end);
+    body.addEventListener('wheel', e => {
+      if (!e.ctrlKey && !e.metaKey) return;          // trackpad pinch arrives as ctrl+wheel
+      e.preventDefault();
+      this.zoomTree(id, Math.exp(-e.deltaY * 0.01), e);
+    }, { passive: false });
+  }
+  zoomTree(id, op, ev) {
+    const body = $(`#${id}-body`), tree = $(`#${id}-tree`);
+    const old = this.zoom[id];
+    const w = parseFloat(tree.style.width), hgt = parseFloat(tree.style.height);
+    let z = op === '+' ? old * 1.2 : op === '-' ? old / 1.2
+      : op === 'fit' ? Math.min(body.clientWidth / w, body.clientHeight / hgt, 1) : old * op;
+    z = Math.max(0.35, Math.min(1.6, z));
+    // keep the point under the cursor (or the view centre) fixed while zooming
+    const r = body.getBoundingClientRect();
+    const fx = ev ? ev.clientX - r.left : body.clientWidth / 2, fy = ev ? ev.clientY - r.top : body.clientHeight / 2;
+    const cx = (body.scrollLeft + fx) / old, cy = (body.scrollTop + fy) / old;
+    this.zoom[id] = z;
+    tree.style.zoom = z;
+    body.scrollLeft = cx * z - fx; body.scrollTop = cy * z - fy;
+    if (op === 'fit') { body.scrollLeft = (body.scrollWidth - body.clientWidth) / 2; body.scrollTop = (body.scrollHeight - body.clientHeight) / 2; }
+    setText($(`[data-zoomer="${id}"] .z-v`), Math.round(z * 100) + '%');
+  }
+  centreFam() {
+    const b = $('#fam-body'), z = this.zoom.fam;
+    b.scrollLeft = this.famRoot.x * z - b.clientWidth / 2;
+    b.scrollTop = this.famRoot.y * z - b.clientHeight / 2;
+  }
+
   renderRdAuto() {
     const el = $('#rd-auto'), m = S.getMods(this.g), s = this.g.settings;
     if (!m.autoResearch) { setHTML(el, ''); return; }
@@ -263,7 +314,7 @@ export class UI {
     this.sfx('open');
     if (id === 'ledger') this.renderLedger();
     if (id === 'rd') this.renderRdAuto();
-    if (id === 'fam') { this.renderEvolve(); const b = $('#fam-body'); b.scrollLeft = (b.scrollWidth - b.clientWidth) / 2; b.scrollTop = (b.scrollHeight - b.clientHeight) / 2; }
+    if (id === 'fam') { this.renderEvolve(); this.centreFam(); }
     this.update(true);
   }
   close() {
@@ -323,14 +374,20 @@ export class UI {
 
   // ── Family tree ──────────────────────────────────────────
   buildFam() {
-    const SZ = 1500, C = SZ / 2, STEP = 175, NW = 170, NH = 84;
+    const STEP = 175, NW = 170, NH = 84, PAD = 60;
     const tree = $('#fam-tree');
-    tree.style.width = SZ + 'px'; tree.style.height = (SZ - 300) + 'px';
-    const yOff = -150;
-    const pos = s => {
+    const BR_D = i => (i === 4 || i === 5 ? 4.75 : 3.75);
+    const raw = s => {
       const a = -Math.PI / 2 + s.dir * Math.PI / 3 + (s.da || 0);
-      return { x: C + Math.cos(a) * s.d * STEP * 1.25, y: C + yOff + Math.sin(a) * s.d * STEP };
+      return { x: Math.cos(a) * s.d * STEP * 1.25, y: Math.sin(a) * s.d * STEP };
     };
+    // size the canvas from the actual node + label positions so no branch can fall off an edge
+    const pts = [...SKILLS.map(raw), ...[0, 1, 2, 3, 4, 5].map(i => raw({ dir: i, d: BR_D(i) }))];
+    const minX = Math.min(...pts.map(p => p.x)) - NW / 2 - PAD, maxX = Math.max(...pts.map(p => p.x)) + NW / 2 + PAD;
+    const minY = Math.min(...pts.map(p => p.y)) - NH / 2 - PAD, maxY = Math.max(...pts.map(p => p.y)) + NH / 2 + PAD;
+    tree.style.width = (maxX - minX) + 'px'; tree.style.height = (maxY - minY) + 'px';
+    const pos = s => { const p = raw(s); return { x: p.x - minX, y: p.y - minY }; };
+    this.famRoot = pos(SKILL_BY_ID.founder);
     let svg = `<svg class="links" width="100%" height="100%">`;
     for (const s of SKILLS) for (const [q] of s.req) {
       const a = pos(SKILL_BY_ID[q]), b = pos(s);
@@ -340,7 +397,7 @@ export class UI {
     const BR = ['BLOODLINE', 'LOGISTICS', 'INDUSTRY', 'COMMERCE', 'ACADEMIA', 'BUREAUCRACY'];
     let html = svg;
     BR.forEach((b, i) => {
-      const p = pos({ dir: i, d: i === 4 ? 4.75 : 3.75 });
+      const p = pos({ dir: i, d: BR_D(i) });
       html += `<div class="branch-l" style="left:${p.x}px;top:${p.y}px">${b}</div>`;
     });
     for (const s of SKILLS) {

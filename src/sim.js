@@ -417,6 +417,7 @@ export function evolve(g) {
   const next = meta.pick;
   meta.offer = null; meta.pick = null;          // a fresh survey after every evolution
   g.run = newRun(meta, next);
+  g.run.autoOn = { ...r.autoOn };               // keep each department's AUTO setting across runs
   return gain;
 }
 

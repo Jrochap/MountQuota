@@ -212,7 +212,7 @@ button { font: inherit; color: inherit; }
 .node.leap.affordable { background: #fff1ea; }
 
 .fam-wrap { flex: 1; display: flex; min-height: 0; }
-.fam-wrap .ov-body { flex: 1; }
+.fam-wrap .ov-body { flex: 1; min-width: 0; }   /* min-width:0 lets the tree scroll sideways instead of stretching the flex row */
 .node.sk { width: 170px; height: 84px; }
 .node.sk.owned { background: var(--ink); color: var(--paper); }
 .node.sk.owned .n-fx { color: var(--acc); }
@@ -313,3 +313,12 @@ body.no-ticker .memo { bottom: 100px; }
 .rdauto .chip.on { background: var(--acc); border-color: var(--acc); }
 .rdauto .chip:hover { background: #333; }
 .rdauto .dim { color: #a9a49a; font-size: 10px; }
+
+/* ── tree navigation ── */
+.ov-body.pan { cursor: grab; touch-action: pan-x pan-y; }
+.ov-body.pan.dragging { cursor: grabbing; user-select: none; }
+.ov-body.pan .node:not(.locked):not(.done):not(.maxed) { cursor: pointer; }
+.zoomer { display: flex; align-items: center; gap: 4px; margin-left: 14px; }
+.zoomer .chip { border-color: var(--paper); color: var(--paper); padding: 1px 7px; }
+.zoomer .chip:hover { background: #333; }
+.zoomer .z-v { font-size: 10px; color: #a9a49a; min-width: 34px; text-align: center; }
