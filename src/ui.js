@@ -619,7 +619,7 @@ export class UI {
       setText(tag, c === minCat ? 'BOTTLENECK' : '');
       st.classList.toggle('neck', c === minCat);
     }
-    setHTML($('#buffs'), r.buffs.map(b => `<span class="buff ${b.x < 1 ? 'neg' : ''}">${b.k.toUpperCase()} ×${b.x} <i>${Math.ceil(b.until - r.t)}s</i></span>`).join(''));
+    setHTML($('#buffs'), r.buffs.map(b => `<span class="buff ${(b.k === 'time' ? b.x > 1 : b.x < 1) ? 'neg' : ''}">${b.k === 'time' ? 'YEARS' : b.k.toUpperCase()} ×${b.x} <i>${Math.ceil(b.until - r.t)}s</i></span>`).join(''));
 
     // units
     const key = `${r.era}|${m.auto}|${g.settings.buyAmt}|${JSON.stringify(r.autoOn)}`;

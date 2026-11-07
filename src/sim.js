@@ -425,16 +425,36 @@ export function resolveEvent(g, optIndex) {
   const ev = EVENTS.find(e => e.id === r.event);
   if (!ev) return null;
   const opt = ev.opts[optIndex];
-  const f = r.flow;
-  for (const e of opt.fx) {
+  if (!opt) return null;
+  const out = applyEventFx(g, opt.fx, ev.id) || opt.out;
+  r.event = null;
+  r.nextEvent = r.t + 120 + Math.random() * 120;
+  return out;
+}
+// returns an outcome text when a gamble decides it
+function applyEventFx(g, fx, src) {
+  const r = g.run, f = r.flow;
+  let text = null;
+  for (const e of fx) {
     if (e.t === 'credits') r.credits = Math.max(0, r.credits * (1 + e.frac));
     else if (e.t === 'rp') r.rp += Math.max(5, f.rp * e.secs);
     else if (e.t === 'cash') r.credits += Math.max(50, f.cash * e.secs);
-    else if (e.t === 'buff') r.buffs.push({ k: e.k, x: e.x, until: r.t + e.dur, dur: e.dur, src: ev.id });
+    else if (e.t === 'buff') r.buffs.push({ k: e.k, x: e.x, until: r.t + e.dur, dur: e.dur, src });
+    else if (e.t === 'gamble') {
+      const win = Math.random() < e.p;
+      applyEventFx(g, win ? e.win : e.lose, src);
+      text = (win ? '✓ ' + e.winOut : '✗ ' + e.loseOut);
+    } else if (e.t === 'units') {
+      // free units of the newest era in each listed department
+      for (const c of e.cats) { const own = r.units[c][r.era]; buyCount(g, c, r.era, Math.max(1, Math.ceil(own * e.frac))); }
+    } else if (e.t === 'mine') {
+      // instantly dislodge `secs` worth of mining onto the face pile
+      const R = rates(g, getMods(g));
+      const amt = Math.max(0, Math.min(R.mining * e.secs, massOf(r) - r.mined));
+      r.mined += amt; r.face += amt;
+    }
   }
-  r.event = null;
-  r.nextEvent = r.t + 120 + Math.random() * 120;
-  return opt.out;
+  return text;
 }
 
 // ── Succession / prestige ────────────────────────────────────

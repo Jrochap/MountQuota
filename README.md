@@ -36,7 +36,7 @@ Add `?speed=20` to the URL to fast-forward while testing.
 - **Succession**: every 25 years the CEO dies and you choose from 3 heirs. Each one has a trade-off trait and a
   satirical bio; if you don't choose within 30 seconds, the board picks for you. A good pick for your current
   bottleneck saves about 6 years per run. *Selective Succession* gives 4 candidates with their downsides halved.
-- **Board memos**: random satirical events with two choices that give temporary buffs.
+- **Board memos**: 25 random satirical events, some only in certain eras. They have 2–3 choices, including gambles, slowed years, free units and instant mining.
 - **Mountains**: 8 of them, each with its own shape, rock and trade-offs: Mt. Obstinate, The Twin Liabilities,
   Mesa Verde Capital, Mt. Overdraft (an active volcano), The Long Grievance (a ridge), Spire of Compliance,
   Ziggurat of Unpaid Interns and Marble Arch-Nemesis. Each one changes the tonnage, gameplay modifiers and Legacy
