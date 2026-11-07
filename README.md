@@ -33,7 +33,9 @@ Add `?speed=20` to the URL to fast-forward while testing.
 - **Density**: rock gets exponentially denser with depth, so every % of the mountain costs more than the last.
 - **R&D tree**: 6 eras × 7 rows. Each *Generational Leap* unlocks the next era of equipment:
   Hands & Hope → Steam & Soot → Diesel & Quarterly Reports → Silicon & Severance → Lasers & Liability → Post-Physical Synergy.
-- **Generations**: every 25 years a new heir takes over, with a random trait (buff or debuff).
+- **Succession**: every 25 years the CEO dies and you choose from 3 heirs. Each one has a trade-off trait and a
+  satirical bio; if you don't choose within 30 seconds, the board picks for you. A good pick for your current
+  bottleneck saves about 6 years per run. *Selective Succession* gives 4 candidates with their downsides halved.
 - **Board memos**: random satirical events with two choices that give temporary buffs.
 - **Mountains**: 8 of them, each with its own shape, rock and trade-offs: Mt. Obstinate, The Twin Liabilities,
   Mesa Verde Capital, Mt. Overdraft (an active volcano), The Long Grievance (a ridge), Spire of Compliance,
@@ -65,6 +67,7 @@ python3 tools/balance.py mountains        # first run on every mountain
 python3 tools/balance.py chain --runs 12  # prestige curve with greedy Legacy spending
 python3 tools/balance.py oldunits         # how much output comes from buying older units
 python3 tools/balance.py gary --trials 20 # auto-buy tiers compared
+python3 tools/balance.py heirs --trials 20 # does choosing the heir matter?
 python3 tools/balance.py all
 ```
 Random heir traits add noise of about ±5 years per run, so use `--trials 20` before trusting small differences.

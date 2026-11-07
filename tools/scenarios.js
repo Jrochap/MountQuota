@@ -131,6 +131,48 @@ const SCENARIOS = {
     out(`  final Legacy Workforce on Era VI mining: ×${mean(wf).toFixed(1)}`);
   },
 
+  // Does choosing the heir matter? Board-random picks vs always taking the strongest candidate.
+  heirs() {
+    // a context-aware player: buffs to the current bottleneck count fully, other departments a little,
+    // all-output triple, slower years are worth a lot (they cut the score directly)
+    const score = (tr, g) => {
+      const R = rates(g, getMods(g)), neck = CAT_IDS.reduce((a, b) => (R[b] < R[a] ? b : a));
+      return Object.entries(tr.mods).reduce((s, [k, v]) => {
+        const w = k === 'global' ? 3 : k === 'time' ? -8 : k === 'rp' ? 0.6 : k === 'value' ? 1 : k === 'click' ? 0 : k === neck ? 1 : 0.3;
+        return s * Math.pow(v, w);
+      }, 1);
+    };
+    const trial = (skills, smart) => {
+      const ys = [];
+      for (let k = 0; k < ARGS.trials; k++) {
+        const g = freshGame(skills);
+        // tick online so successions wait for a choice, then decide immediately
+        for (const c of CAT_IDS) g.run.autoOn[c] = true;
+        while (!g.run.complete && g.run.years < 400) {
+          tick(g, 0.5, false);
+          g.run.event = null; g.run.nextEvent = Infinity;          // no memos in this test
+          const s = g.run.succession;
+          if (s) {
+            let i = Math.floor(Math.random() * s.candidates.length);
+            if (smart) i = s.candidates.reduce((b, c, j) => (score(c.trait, g) > score(s.candidates[b].trait, g) ? j : b), 0);
+            chooseHeir(g, i);
+          }
+          let b;
+          do { b = null; for (const n of RESEARCH) if (researchState(g, n.id) === 'affordable' && (!b || n.cost < b.cost)) b = n; if (b) doResearch(g, b.id); } while (b);
+          const m = getMods(g); if (!m.auto) autoBuy(g, m, rates(g, m));
+          g.out.length = 0;
+        }
+        ys.push(g.run.years);
+      }
+      return fmtY(ys);
+    };
+    out(`HEIR CHOICE · ${ARGS.trials} trials each`);
+    out(`  board picks at random         : ${trial({}, false)}`);
+    out(`  smart pick of 3 (bottleneck)  : ${trial({}, true)}`);
+    out(`  Selective Succession, random  : ${trial({ breeding: 1 }, false)}`);
+    out(`  Selective Succession, smart of 4: ${trial({ breeding: 1 }, true)}`);
+  },
+
   // Auto-buy tiers compared on identical setups.
   gary() {
     const trial = (skills, manualResearch, prio) => {

@@ -329,3 +329,25 @@ body.no-ticker .memo { bottom: 100px; }
 .drain b { background: var(--ink); padding: 0 5px; margin-right: 6px; animation: pulse 1s infinite; }
 .drain span { font-size: 10px; opacity: .9; margin-left: 6px; }
 @media (max-width: 980px) { .drain { left: 50%; white-space: normal; width: calc(100% - 28px); } }
+
+/* ── succession ── */
+.succ { position: absolute; left: calc((100% - var(--ops-w)) / 2); transform: translateX(-50%); bottom: 130px; width: min(760px, calc(100% - var(--ops-w) - 60px)); padding: 12px 14px; border-color: var(--ink); box-shadow: 6px 6px 0 var(--ink); animation: riseIn .35s; z-index: 5; }
+.succ[hidden] { display: none; }
+@keyframes riseIn { from { transform: translate(-50%, 20px); opacity: 0; } }
+.cands { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px; margin-top: 8px; }
+.cand { text-align: left; border: 2px solid var(--ink); background: var(--paper); padding: 8px 9px; cursor: pointer; display: flex; flex-direction: column; gap: 4px; box-shadow: 3px 3px 0 var(--ink); transition: transform .06s, box-shadow .06s; }
+.cand:hover { background: var(--ink); color: var(--paper); }
+.cand:hover .c-b { color: #a9a49a; }
+.cand:active { transform: translate(3px, 3px); box-shadow: none; }
+.cand:active::after { content: ''; position: absolute; inset: -6px; }
+.cand { position: relative; }
+.c-n { font-weight: 700; font-size: 13px; }
+.c-t { font-size: 11px; font-weight: 700; color: var(--acc); }
+.c-t i { font-style: normal; background: var(--acc); color: #fff; font-size: 8px; padding: 0 3px; margin-left: 3px; }
+.c-m { display: flex; flex-wrap: wrap; gap: 4px; font-family: var(--f-mono); font-size: 9.5px; }
+.c-m b { font-weight: 700; padding: 0 4px; border: 1.5px solid currentColor; }
+.c-m b.down { color: #b3261e; }
+.c-b { font-size: 10.5px; color: var(--mute); line-height: 1.3; }
+.succ-f { font-size: 10px; color: var(--mute); margin-top: 8px; }
+.succ-f b { color: var(--acc); }
+@media (max-width: 980px) { .succ { left: 50%; width: calc(100% - 28px); bottom: calc(46vh + 80px); } }

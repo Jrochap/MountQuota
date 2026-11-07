@@ -97,6 +97,7 @@ export class UI {
     </aside>
 
     <div class="memo panel" id="memo" hidden></div>
+    <div class="succ panel" id="succ" hidden></div>
     <div class="toasts" id="toasts"></div>
     <div class="banner" id="banner" hidden></div>
     <div class="drain" id="drain" hidden><b>▶▶ ×${S.DRAIN_SPEED}</b> LAST BLOCK MINED — FAST-FORWARDING FINAL SHIPMENTS <span class="mono" id="drain-t"></span></div>
@@ -191,6 +192,7 @@ export class UI {
       if (S.buySkill(this.g, t.dataset.skill)) { this.sfx('skill'); const s = SKILL_BY_ID[t.dataset.skill]; this.toast(`INHERITED — ${s.name}`, s.fxt(this.g.meta.skills[s.id])); this.update(true); }
       return;
     }
+    if (t.dataset.heir != null) { S.chooseHeir(this.g, +t.dataset.heir); return; }
     if (t.dataset.memo != null) {
       const out = S.resolveEvent(this.g, +t.dataset.memo);
       this.sfx('memoPick');
@@ -291,6 +293,25 @@ export class UI {
     const b = $('#fam-body'), z = this.zoom.fam;
     b.scrollLeft = this.famRoot.x * z - b.clientWidth / 2;
     b.scrollTop = this.famRoot.y * z - b.clientHeight / 2;
+  }
+
+  renderSuccession() {
+    const r = this.run, s = r.succession, el = $('#succ');
+    if (!s) { el.hidden = true; return; }
+    // for "years elapse" a value above 1 is the bad direction
+    const traitTxt = mods => Object.entries(mods).map(([k, v]) => `<b class="${(k === 'time' ? v <= 1 : v >= 1) ? 'up' : 'down'}">${esc(FX_LABEL[k] || k)} ×${+v.toFixed(3)}</b>`).join(' ');
+    el.innerHTML = `
+      <div class="memo-k">SUCCESSION — GENERATION ${S.roman(s.gen + 1)}</div>
+      <div class="memo-t">${esc(r.heir.name)} has died. Choose the next CEO.</div>
+      <div class="cands">${s.candidates.map((c, i) => `
+        <button class="cand" data-heir="${i}">
+          <span class="c-n">${esc(c.name)}</span>
+          <span class="c-t">${esc(c.trait.name)}${c.trait.rare ? ' <i>RARE</i>' : ''}</span>
+          <span class="c-m">${traitTxt(c.trait.mods)}</span>
+          <span class="c-b">${esc(c.bio)}</span>
+        </button>`).join('')}</div>
+      <div class="succ-f mono">The board decides in <b id="succ-t"></b>. ${esc(r.heir.name)}'s trait applies until then.</div>`;
+    el.hidden = false;
   }
 
   renderRdAuto() {
@@ -655,6 +676,11 @@ export class UI {
     }
     if (this.open === 'rd') this.updateRD();
     if (this.open === 'fam') { this.updateFam(); if (force) this.renderEvolve(); }
+    if (r.succession) {
+      if ($('#succ').hidden) this.renderSuccession();
+      const left = Math.max(0, Math.ceil(r.succession.deadline - r.t));
+      const st = $('#succ-t'); if (st) setText(st, left + 's');
+    } else if (!$('#succ').hidden) $('#succ').hidden = true;
     const dr = S.isDraining(r), de = $('#drain');
     if (r.clicks >= 6 || dr || r.complete) $('#hint').hidden = true;
     if (de.hidden === dr) de.hidden = !dr;
@@ -663,10 +689,14 @@ export class UI {
 
   // ── reactions to sim events ──────────────────────────────
   handle(ev) {
-    if (ev.type === 'gen') {
-      const t = ev.heir.trait;
+    if (ev.type === 'succession') {
       this.sfx('gen');
-      this.toast(`GENERATION ${S.roman(ev.heir.gen + 1)}`, `${ev.heir.name} inherits the company, the mountain and the debt. Trait: ${t.name}.`);
+      this.renderSuccession();
+    } else if (ev.type === 'gen') {
+      const t = ev.heir.trait;
+      $('#succ').hidden = true;
+      if (!ev.byBoard) this.sfx('memoPick');
+      this.toast(`GENERATION ${S.roman(ev.heir.gen + 1)} — ${ev.heir.name}`, `${ev.byBoard ? ev.line + ' ' : ''}Inherits the company, the mountain and the debt. Trait: ${t.name}.`);
     } else if (ev.type === 'era') {
       const e = ERAS[ev.era];
       this.sfx('leap');

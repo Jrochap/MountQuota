@@ -5,7 +5,7 @@ import {
   SEC_PER_YEAR, GEN_YEARS, MASS_K, MASS_M0, STRATA, MOUNTAINS, MOUNTAIN_BY_ID, OFFER_SIZE, BASE_VALUE, RP_PER_TON, BUFFER_SECONDS, BUFFER_MIN,
   COST_GROWTH, WORKFORCE, MILESTONES, MILESTONE_X, DEPRECIATION, GARY_SAVE_SECONDS, GARY_SAVE_ADVANTAGE, GARY_BALANCE, LEGACY_BONUS, LEGACY_PROGRESS, LEGACY_COMPLETE, PAR_YEARS,
   CATS, UNITS, RESEARCH, RESEARCH_BY_ID, SKILLS, SKILL_BY_ID, TRUST_FUND,
-  FIRST_NAMES, TRAITS, FOUNDER_TRAIT, EVENTS,
+  FIRST_NAMES, TRAITS, FOUNDER_TRAIT, softenTrait, EVENTS, SUCCESSION_SECONDS, HEIR_BIOS, BOARD_PICK_LINES,
 } from './data.js';
 
 const CAT_IDS = CATS.map(c => c.id);
@@ -25,9 +25,27 @@ export function newMeta() {
 // ── Run ──────────────────────────────────────────────────────
 export function makeHeir(gen, meta) {
   if (gen === 0) return { name: 'Ezekiel Quarry', gen: 0, trait: FOUNDER_TRAIT };
-  let pool = TRAITS.filter(t => !t.rare || Math.random() < 0.25);
-  if (meta.skills.breeding) pool = pool.filter(t => t.good);
-  return { name: `${pick(FIRST_NAMES)} Quarry ${roman(gen + 1)}`, gen, trait: pick(pool) };
+  return heirCandidates(gen, meta)[0];
+}
+// distinct candidates (names, traits, bios); Selective Succession → 4 candidates, all good traits
+export function heirCandidates(gen, meta) {
+  const n = meta.skills.breeding ? 4 : 3;
+  const pool = TRAITS.filter(t => !t.rare || Math.random() < 0.2);
+  const shuffle = a => a.map(v => [Math.random(), v]).sort((x, y) => x[0] - y[0]).map(v => v[1]);
+  const traits = shuffle(pool), names = shuffle(FIRST_NAMES), bios = shuffle(HEIR_BIOS);
+  const out = [];
+  for (let i = 0; i < Math.min(n, traits.length); i++)
+    out.push({ name: `${names[i]} Quarry ${roman(gen + 1)}`, gen, trait: meta.skills.breeding ? softenTrait(traits[i]) : traits[i], bio: bios[i % bios.length] });
+  return out;
+}
+// install a candidate as CEO
+export function chooseHeir(g, i, byBoard = false) {
+  const r = g.run, s = r.succession;
+  if (!s) return null;
+  const heir = s.candidates[Math.max(0, Math.min(s.candidates.length - 1, i))];
+  r.heir = heir; r.succession = null;
+  g.out.push({ type: 'gen', heir, byBoard, line: byBoard ? pick(BOARD_PICK_LINES) : null });
+  return heir;
 }
 
 // ── Mountains ────────────────────────────────────────────────
@@ -172,9 +190,14 @@ export function tick(g, dt, offline = false) {
   // generations
   const gen = Math.floor(r.years / GEN_YEARS);
   if (gen > r.gen) {
-    r.gen = gen; r.heir = makeHeir(gen, g.meta);
-    g.out.push({ type: 'gen', heir: r.heir });
+    if (r.succession) chooseHeir(g, Math.floor(Math.random() * r.succession.candidates.length), true);  // overdue pick
+    r.gen = gen;
+    // the old CEO's trait keeps applying while the board deliberates
+    r.succession = { gen, candidates: heirCandidates(gen, g.meta), deadline: r.t + SUCCESSION_SECONDS };
+    if (offline) chooseHeir(g, Math.floor(Math.random() * r.succession.candidates.length), true);
+    else g.out.push({ type: 'succession' });
   }
+  if (r.succession && r.t >= r.succession.deadline) chooseHeir(g, Math.floor(Math.random() * r.succession.candidates.length), true);
 
   r.buffs = r.buffs.filter(b => b.until > r.t);
 

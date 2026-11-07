@@ -264,8 +264,8 @@ export const SKILLS = [
     apply: m => { m.smartBuy = true; }, fxt: () => 'Smart auto-buy + budget control' },
   { id: 'garyjr', name: 'Gary Jr.', desc: "Gary's son. Nobody interviewed him. Auto-research from the first minute of every run, with a priority you set.", dir: 5, d: 3.1, da: -0.38, max: 1, cost: () => 60, req: [['procure', 1]],
     apply: m => { m.autoResearch = true; m.researchPro = true; }, fxt: () => 'Auto-research from the start + priorities' },
-  { id: 'breeding', name: 'Selective Succession', desc: 'Heirs chosen by merit. Merit defined by the board.', dir: 5, d: 2.45, da: 0.5, max: 1, cost: () => 60, req: [['procure', 1]],
-    fxt: () => 'Heirs always get a good trait' },
+  { id: 'breeding', name: 'Selective Succession', desc: 'Heirs chosen by merit. Merit defined by the board. More candidates, fewer flaws.', dir: 5, d: 2.45, da: 0.5, max: 1, cost: () => 60, req: [['procure', 1]],
+    fxt: () => '4 heir candidates, downsides halved' },
 ];
 export const SKILL_BY_ID = Object.fromEntries(SKILLS.map(s => [s.id, s]));
 export const TRUST_FUND = [0, 1e3, 1e5, 1e7, 1e9];
@@ -273,21 +273,54 @@ export const TRUST_FUND = [0, 1e3, 1e5, 1e7, 1e9];
 // ── Heirs ────────────────────────────────────────────────────
 export const FIRST_NAMES = ['Barnaby', 'Chadwick', 'Prudence', 'Montgomery', 'Ingrid', 'Thaddeus', 'Wilhelmina', 'Brock',
   'Tiffany', 'Cornelius', 'Gertrude', 'Kyle', 'Beatrix', 'Lysander', 'Mildred', 'Tucker', 'Octavia', 'Reginald', 'Skylar', 'Bartholomew'];
-export const FOUNDER_TRAIT = { name: 'Unshakeable Confidence', mods: { click: 2 }, good: true };
-export const TRAITS = [
-  { name: 'Believes in Crypto',          mods: { value: 1.15, mining: 0.95 } },
-  { name: 'Gym Enthusiast',              mods: { mining: 1.2 }, good: true },
-  { name: 'Collects Model Trains',       mods: { extraction: 1.2 }, good: true },
-  { name: 'Has Read One Book',           mods: { rp: 1.25 }, good: true },
-  { name: 'Micromanager',                mods: { processing: 1.2, extraction: 0.92 } },
-  { name: 'Visionary (Self-Described)',  mods: { rp: 1.4, value: 0.9 } },
-  { name: 'Golfs Constantly',            mods: { value: 1.1, processing: 0.95 } },
-  { name: 'Nepotism Enthusiast',         mods: { global: 1.05 }, good: true },
-  { name: 'Actually Competent',          mods: { global: 1.2 }, good: true, rare: true },
-  { name: 'Afraid of Rocks',             mods: { mining: 0.85, rp: 1.15 } },
-  { name: 'Podcast Host',                mods: { value: 1.2, rp: 0.9 } },
-  { name: 'Thinks Mountains Are Hollow', mods: { mining: 1.1, extraction: 1.1, value: 0.9 } },
+export const FOUNDER_TRAIT = { name: 'Unshakeable Confidence', mods: { click: 2 }, safe: true };
+// ── Succession ───────────────────────────────────────────────
+export const SUCCESSION_SECONDS = 30;    // the board picks if you don't
+export const HEIR_BIOS = [
+  'Studied at a university that no longer exists.',
+  'Has never seen the mountain. Has seen photos.',
+  'Previously ran a juice bar into the ground.',
+  'Was raised by a series of nannies and one accountant.',
+  'Describes themselves as "a disruptor". Has disrupted two marriages.',
+  'Can name every shareholder. Cannot name a single worker.',
+  'Won a regional spelling bee in 1987. Brings it up.',
+  'Owns eleven boats. Uses none of them.',
+  'Has a five-year plan. It is a mood board.',
+  'Spent a gap year "finding themselves". Found a yacht.',
+  'Once lifted a rock. Talks about it constantly.',
+  'Was second choice. The first choice is "on sabbatical".',
+  'Sends emails exclusively in capital letters.',
+  'Believes the mountain is "basically a big stock".',
+  'Has an MBA from a website.',
+  'Thinks pickaxes are "a bit retro".',
 ];
+export const BOARD_PICK_LINES = [
+  'The board chose while you were in a meeting.',
+  'The board chose by drawing straws. One straw was a cigar.',
+  'The board went with whoever arrived first to the funeral.',
+  'The board flipped a coin. The coin is now on the board.',
+];
+
+// Every trait is a trade-off; the right heir depends on your bottleneck and phase of the run.
+// `safe` traits have no downside and are rare. Selective Succession halves all downsides.
+export const TRAITS = [
+  { name: 'Gym Enthusiast',              mods: { mining: 1.5, rp: 0.8 } },
+  { name: 'Collects Model Trains',       mods: { extraction: 1.5, value: 0.85 } },
+  { name: 'Micromanager',                mods: { processing: 1.5, extraction: 0.8 } },
+  { name: 'Has Read One Book',           mods: { rp: 1.6, mining: 0.85 } },
+  { name: 'Believes in Crypto',          mods: { value: 1.5, processing: 0.8 } },
+  { name: 'Visionary (Self-Described)',  mods: { rp: 1.8, value: 0.8 } },
+  { name: 'Golfs Constantly',            mods: { value: 1.35, mining: 0.85 } },
+  { name: 'Podcast Host',                mods: { value: 1.4, rp: 0.8 } },
+  { name: 'Thinks Mountains Are Hollow', mods: { mining: 1.3, extraction: 1.3, value: 0.75 } },
+  { name: 'Workaholic',                  mods: { global: 1.25, time: 1.08 } },
+  { name: 'Sleeps Until Noon',           mods: { time: 0.94, global: 0.85 } },
+  { name: 'Rock Mystic',                 mods: { click: 25, mining: 0.9 } },
+  { name: 'Nepotism Enthusiast',         mods: { global: 1.1 }, safe: true, rare: true },
+  { name: 'Actually Competent',          mods: { global: 1.3 }, safe: true, rare: true },
+];
+// halve a trait's downsides (Selective Succession)
+export const softenTrait = tr => ({ ...tr, mods: Object.fromEntries(Object.entries(tr.mods).map(([k, v]) => [k, v < 1 ? 1 - (1 - v) / 2 : v])), softened: true });
 
 // ── Board memos (random events) ──────────────────────────────
 // effects: buff {k,x,dur} · credits {frac} · rp {secs} (secs of current RP income) · cash {secs}
